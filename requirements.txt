@@ -1,0 +1,5 @@
+bleak
+picamera2
+luma.oled
+pynmea2
+Flask
