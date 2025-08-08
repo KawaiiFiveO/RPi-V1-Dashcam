@@ -671,52 +671,62 @@ class V1BleakClient:
 
     async def request_sweeps(self) -> Optional[List[SweepDefinition]]:
         """Requests all custom sweep definitions from the V1."""
-        if self.firmware_version == 0.0:
-            print("Unknown firmware version. Please run the 'ver' command first.")
+
+        # First, find out how many sweeps are defined.
+        max_idx_resp = await self._request_and_wait(
+            PacketId.REQMAXSWEEPINDEX,
+            PacketId.RESPMAXSWEEPINDEX,
+            DeviceId.VALENTINE_ONE
+        )
+        if not isinstance(max_idx_resp, ResponseMaxSweepIndex):
+            print("\nFailed to get max sweep index.")
             return None
-        if self.firmware_version < MIN_SWEEP_FW_VERSION:
-            print(f"Sweeps not supported on V{self.firmware_version:.4f}. "
-                  f"Requires V{MIN_SWEEP_FW_VERSION:.4f}+.")
-            return None
 
-        async with self.request_lock:
-            # First, find out how many sweeps are defined.
-            max_idx_resp = await self._request_and_wait(
-                PacketId.REQMAXSWEEPINDEX,
-                PacketId.RESPMAXSWEEPINDEX,
-                DeviceId.VALENTINE_ONE
-            )
-            if not isinstance(max_idx_resp, ResponseMaxSweepIndex):
-                return None
+        # The max_sweep_index is 0-based, so the total number of sweeps is index + 1.
+        num_sweeps = max_idx_resp.max_sweep_index + 1
+        if num_sweeps == 0:
+            print("\nNo custom sweeps are supported or defined.")
+            return []
+            
+        print(f"\nV1 has {num_sweeps} sweep definitions. Reading...")
 
-            num_sweeps = max_idx_resp.max_sweep_index + 1
-            print(f"V1 supports {num_sweeps} sweeps. Reading definitions...")
+        # Prepare a queue to collect all incoming sweep definition packets.
+        sweep_queue = asyncio.Queue()
+        self.pending_responses[PacketId.RESPSWEEPDEFINITION] = sweep_queue
+        
+        sweeps: Dict[int, SweepDefinition] = {}
 
-            # Prepare a queue to collect all incoming sweep definition packets.
-            sweep_queue = asyncio.Queue()
-            self.pending_responses[PacketId.RESPSWEEPDEFINITION] = sweep_queue
-            sweeps = []
+        try:
+            # Send a single request to get all sweep definitions.
+            await self._send_request(PacketId.REQALLSWEEPDEFINITIONS, DeviceId.VALENTINE_ONE)
 
-            try:
-                # Send a single request to get all sweep definitions.
-                await self._send_request(PacketId.REQALLSWEEPDEFINITIONS, DeviceId.VALENTINE_ONE)
-
-                # Wait for and collect the expected number of responses.
-                for _ in range(num_sweeps):
-                    response = await asyncio.wait_for(sweep_queue.get(), timeout=5.0)
+            # Collect responses until we have the expected number or we time out.
+            # This is more robust than a simple for loop, as it handles dropped
+            # or out-of-order packets and has a total timeout for the operation.
+            async with asyncio.timeout(10.0):
+                while len(sweeps) < num_sweeps:
+                    response = await sweep_queue.get()
                     if isinstance(response, ResponseSweepDefinition):
-                        sweeps.append(response.sweep_definition)
+                        sweep_def = response.sweep_definition
+                        # Store by index to handle out-of-order packets and duplicates
+                        if sweep_def.index not in sweeps:
+                            sweeps[sweep_def.index] = sweep_def
+                            logging.debug(f"Received sweep {sweep_def.index + 1}/{num_sweeps}")
 
-                # Sort by index for a clean display.
-                sweeps.sort(key=lambda s: s.index)
-                return sweeps
-            except asyncio.TimeoutError:
-                print("Timeout while collecting sweep definitions.")
-                return None
-            finally:
-                # Clean up the pending response queue.
-                if PacketId.RESPSWEEPDEFINITION in self.pending_responses:
-                    del self.pending_responses[PacketId.RESPSWEEPDEFINITION]
+            # Sort by index for a clean display.
+            sorted_sweeps = [sweeps[i] for i in sorted(sweeps.keys())]
+            return sorted_sweeps
+            
+        except TimeoutError:
+            print(f"\nTimeout while collecting sweep definitions. Received {len(sweeps)} of {num_sweeps}.")
+            return None
+        except Exception as e:
+            print(f"\nAn error occurred while fetching sweeps: {e}")
+            return None
+        finally:
+            # Clean up the pending response queue.
+            if PacketId.RESPSWEEPDEFINITION in self.pending_responses:
+                del self.pending_responses[PacketId.RESPSWEEPDEFINITION]
 
     async def start_alert_data(self):
         """Requests the V1 to start streaming its alert table data."""
