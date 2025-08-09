@@ -43,9 +43,9 @@ Then, once you're ready to try the dashcam:
 python main.py
 ```
 
-You can configure settings such as recording duration in `config.py`.
+You can configure settings such as recording duration and camera orientation in `config.py`.
 
-If you want it to run automatically, setup the service:
+If you want it to run automatically on boot, setup the service:
 
 ```
 sudo cp service/dashcam.service /etc/systemd/system/dashcam.service
@@ -95,5 +95,5 @@ Replace `V1-Dashcam-Hotspot`, `MyHomeWifi`, and `MyPasswordHere` with your own v
 - improve web interface
 - fix video/audio desync
 - more detailed overlay
-- fix video timestamp
+- make audio optional
 - TEST EVERYTHING
