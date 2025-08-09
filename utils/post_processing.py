@@ -46,10 +46,10 @@ def burn_in_data(video_path: str, log_path: str):
         
         timestamp_filter = (
             "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            "text='%{{localtime({epoch}+t)\\:%Y-%m-%d %H\\:%M\\:%S}}':"
+            "text='%{pts\\:hms}':"  # <-- Use a simple, known-working expression first
             "x=w-tw-10:y=10:fontsize=24:fontcolor=white:"
             "box=1:boxcolor=black@0.5:boxborderw=5"
-        ).format(epoch=start_epoch)
+        )
         
         filters.append(timestamp_filter)
         
