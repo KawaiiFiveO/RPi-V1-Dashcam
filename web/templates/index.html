@@ -174,6 +174,29 @@
             font-size: 0.9em;
             margin-left: 10px;
         }
+        .system-actions {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        .processing-list {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 10px;
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+        .processing-list li {
+            margin-bottom: 5px;
+        }
+        .button.disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .button.disabled:hover {
+            background-color: #cccccc;
+        }
     </style>
 </head>
 <body>
@@ -189,6 +212,11 @@
                 <button onclick="postAction('/actions/start_recording')">Start Recording</button>
                 <button onclick="postAction('/actions/stop_recording')" class="button-danger">Stop Recording</button>
             </div>
+        </div>
+        
+        <div class="section system-actions">
+            <h2>System</h2>
+            <button onclick="shutdownPi()" class="button-danger">Shutdown Raspberry Pi</button>
         </div>
 
         <div class="section">
@@ -240,7 +268,14 @@
                 <li>Loading file list...</li>
             </ul>
             <button onclick="refreshFiles()">Refresh File List</button>
+            <div id="processing-status">
+                <h3>Currently Processing:</h3>
+                <ul id="processing-list" class="processing-list">
+                    <li>None</li>
+                </ul>
+            </div>
         </div>
+        
     </div>
 
     <script>
@@ -283,6 +318,22 @@
             const showGps = document.getElementById('gps-toggle').checked;
             const showV1 = document.getElementById('v1-toggle').checked;
             postAction('/actions/set_overlays', { show_gps: showGps, show_v1: showV1 });
+        }
+        
+        function shutdownPi() {
+            if (confirm('Are you sure you want to completely shut down the Raspberry Pi? The device will power off.')) {
+                // Display an immediate message to the user
+                showMessage('Shutdown command sent. The web interface will now become unresponsive.');
+                
+                // Send the request to the backend
+                fetch('/actions/shutdown_pi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                }).catch(error => {
+                    // This will likely fail as the server goes down, which is expected.
+                    console.error('Shutdown request sent, but an error is expected as the server terminates:', error);
+                });
+            }
         }
 
         async function updateStatus() {
@@ -338,13 +389,30 @@
                     document.getElementById('gps-toggle').checked = status.overlays.show_gps;
                     document.getElementById('v1-toggle').checked = status.overlays.show_v1;
                 }
+                
+                // --- NEW: Update the file list with processing status ---
+                refreshFiles(status.processing_files);
+
+                // --- NEW: Update the "Currently Processing" section ---
+                const processingList = document.getElementById('processing-list');
+                processingList.innerHTML = '';
+                if (status.processing_files.length === 0) {
+                    processingList.innerHTML = '<li>None</li>';
+                } else {
+                    status.processing_files.forEach(item => {
+                        const li = document.createElement('li');
+                        li.textContent = `${item.filename} (${item.type})`;
+                        processingList.appendChild(li);
+                    });
+                }
+
             } catch (error) {
                 console.error('Error fetching status:', error);
                 document.getElementById('status-container').innerHTML = '<div class="status-card"><h3>Error loading status.</h3></div>';
             }
         }
 
-        async function refreshFiles() {
+        async function refreshFiles(processingFiles = []) {
             try {
                 const response = await fetch('/files');
                 const files = await response.json();
@@ -355,22 +423,22 @@
                 } else {
                     files.forEach(file => {
                         const li = document.createElement('li');
-                        // --- NEW: Generate analysis text and class ---
-                        let analysisText = '';
-                        let encounterClass = '';
-                        if (file.analysis && file.analysis.has_alerts) {
-                            analysisText = ` <span class="encounter-text">(Encounter: ${file.analysis.alert_points}/${file.analysis.total_points} points)</span>`;
-                            encounterClass = 'encounter';
-                        }
                         
-                        // --- Apply the class to the li element ---
-                        li.className = encounterClass;
+                        // Check if this file is currently being processed
+                        const isProcessing = processingFiles.some(p => 
+                            p.filename === file.name || p.filename === file.name.replace('.mp4', '_processed.mp4')
+                        );
+                        const processingText = isProcessing ? ' (Processing...)' : '';
+                        const disabledClass = isProcessing ? 'disabled' : '';
+                        const downloadVideoHref = isProcessing ? '#' : `/download/video/${file.name}`;
+                        const downloadLogHref = isProcessing ? '#' : `/download/log/${file.log_name}`;
+
                         li.innerHTML = `
-                            <div class="file-info">${file.name} (${file.size})${analysisText}</div>
+                            <div class="file-info">${file.name} (${file.size})${processingText}</div>
                             <div class="file-actions">
-                                <a href="/download/video/${file.name}" class="button">Download Video</a>
-                                ${file.has_log ? `<a href="/download/log/${file.log_name}" class="button">Download Log</a>` : ''}
-                                ${file.has_log ? `<button onclick="burnIn('${file.name}')" class="button-danger">Burn-in Data</button>` : ''}
+                                <a href="${downloadVideoHref}" class="button ${disabledClass}" ${isProcessing ? 'onclick="return false;"' : ''}>Download Video</a>
+                                ${file.has_log ? `<a href="${downloadLogHref}" class="button ${disabledClass}" ${isProcessing ? 'onclick="return false;"' : ''}>Download Log</a>` : ''}
+                                ${file.has_log ? `<button onclick="burnIn('${file.name}')" class="button-danger ${disabledClass}" ${isProcessing ? 'disabled' : ''}>Burn-in Data</button>` : ''}
                             </div>
                         `;
                         list.appendChild(li);

@@ -8,6 +8,7 @@ import os
 
 # Import config to get the logging interval for the overlay duration
 import config
+from shared_state import AppState
 
 def _escape_ffmpeg_text(text: str) -> str:
     """
@@ -27,7 +28,7 @@ def _escape_ffmpeg_text(text: str) -> str:
     return text
 
 
-def burn_in_data(video_path: str, log_path: str):
+def burn_in_data(video_path: str, log_path: str, app_state: AppState):
     """
     Reads a CSV log file and burns the data as a text overlay onto the
     corresponding video file using ffmpeg. This version uses a complex filtergraph
@@ -36,6 +37,10 @@ def burn_in_data(video_path: str, log_path: str):
     print(f"POST-PROCESS: Starting burn-in for {video_path}")
     
     filter_script_file = None
+    output_filename = os.path.basename(video_path).replace('.mp4', '_processed.mp4')
+    
+    # --- Signal start of processing ---
+    app_state.add_processing_file(output_filename, 'burn_in')
     try:
         log_data = pd.read_csv(log_path, parse_dates=['timestamp'])
         if log_data.empty:
@@ -142,6 +147,7 @@ def burn_in_data(video_path: str, log_path: str):
     except Exception as e:
         print(f"POST-PROCESS: An unexpected error occurred: {e}")
     finally:
+        app_state.remove_processing_file(output_filename)
         if filter_script_file and os.path.exists(filter_script_file):
             os.remove(filter_script_file)
             print(f"POST-PROCESS: Cleaned up temporary file {filter_script_file}")

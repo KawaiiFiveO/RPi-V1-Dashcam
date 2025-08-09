@@ -60,7 +60,7 @@ def run_full_mode():
     
     try:
         # The main thread will now block here, waiting for a shutdown signal.
-        while True:
+        while state.get_app_running():
             if not all(t.is_alive() for t in threads.values()):
                 print("MAIN: A critical controller thread has died. Shutting down.")
                 break

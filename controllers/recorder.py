@@ -159,15 +159,21 @@ class Recorder:
         print("RECORDER: Recording loop finished cleanly.")
 
     def _process_finished_clip(self, temp_video_path, temp_audio_path, final_video_path):
-        if os.path.exists(temp_video_path):
-            if self.audio_device_index is not None and os.path.exists(temp_audio_path) and os.path.getsize(temp_audio_path) > 1024:
-                self._mux_video_audio(temp_video_path, temp_audio_path, final_video_path)
-                os.remove(temp_audio_path)
+        # --- Signal start of processing ---
+        self.state.add_processing_file(os.path.basename(final_video_path), 'muxing')
+        try:
+            if os.path.exists(temp_video_path):
+                if self.audio_device_index is not None and os.path.exists(temp_audio_path) and os.path.getsize(temp_audio_path) > 1024:
+                    self._mux_video_audio(temp_video_path, temp_audio_path, final_video_path)
+                    os.remove(temp_audio_path)
+                else:
+                    self._package_video_only(temp_video_path, final_video_path)
+                os.remove(temp_video_path)
             else:
-                self._package_video_only(temp_video_path, final_video_path)
-            os.remove(temp_video_path)
-        else:
-            print(f"RECORDER: Temp video file {temp_video_path} not found for processing.")
+                print(f"RECORDER: Temp video file {temp_video_path} not found for processing.")
+        finally:
+            # --- Signal end of processing, even if an error occurred ---
+            self.state.remove_processing_file(os.path.basename(final_video_path))
 
     def _mux_video_audio(self, video_path, audio_path, output_path):
         print(f"RECORDER: Muxing video and audio to {output_path}...")

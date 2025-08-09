@@ -79,22 +79,20 @@ def create_app(state: Optional[AppState], picam2: Optional[Picamera2], recorder_
     def status():
         """Provides a JSON object with the current application state."""
         if not is_full_mode:
-            # Provide a default "offline" status for web-only mode
             return jsonify({
                 'recorder': {'is_recording': False},
-                'v1': {'is_connected': False, 'in_alert': False, 'v1_mode': 'Offline', 'priority_alert_band': 'N/A', 'priority_alert_freq': 0.0},
+                'v1': {'is_connected': False, 'in_alert': False, 'v1_mode': 'Offline', 'priority_alert_band': 'N/A', 'priority_alert_freq': 0.0, 'priority_alert_direction': 'N/A', 'priority_alert_strength': 0},
                 'gps': {'has_fix': False, 'num_sats': 0},
                 'overlays': {'show_gps': True, 'show_v1': True},
-                # Provide a static default value from the config file
-                'camera': {'rotation': config.VIDEO_ROTATION}
+                'processing_files': []
             })
         
-        # This is the 'full_mode' return, which now correctly omits the camera key
         return jsonify({
             'recorder': {'is_recording': state.get_is_recording()},
             'v1': asdict(state.get_v1_data()),
             'gps': asdict(state.get_gps_data()),
-            'overlays': state.get_overlay_settings()
+            'overlays': state.get_overlay_settings(),
+            'processing_files': state.get_processing_files()
         })
 
     @app.route('/files')
@@ -187,5 +185,32 @@ def create_app(state: Optional[AppState], picam2: Optional[Picamera2], recorder_
         thread.daemon = True
         thread.start()
         return jsonify({'message': f'Burn-in process started for {filename}. A new file ending in "_processed.mp4" will be created.'}), 202
+        
+    @app.route('/actions/shutdown_pi', methods=['POST'])
+    def action_shutdown_pi():
+        if not is_full_mode:
+            return jsonify({'message': 'Cannot shut down in web-only mode.'}), 403
+
+        def shutdown_task():
+            """A task to run in a background thread."""
+            print("WEB: Shutdown initiated from web interface.")
+            
+            # 1. Signal the main application to start its graceful shutdown
+            state.set_app_running(False)
+            
+            # 2. Wait a few seconds for controllers to clean up
+            print("WEB: Waiting 5 seconds for application cleanup...")
+            time.sleep(5)
+            
+            # 3. Issue the OS shutdown command
+            print("WEB: Issuing OS shutdown command.")
+            os.system('sudo /sbin/shutdown now')
+
+        # Run the shutdown sequence in a background thread
+        # so we can immediately return a response to the user.
+        shutdown_thread = threading.Thread(target=shutdown_task)
+        shutdown_thread.start()
+
+        return jsonify({'message': 'Shutdown initiated. The Pi will power off shortly.'}), 202
 
     return app

@@ -113,3 +113,16 @@ class AppState:
             self.v1_data.priority_alert_freq = 0.0
             self.v1_data.priority_alert_direction = direction
             self.v1_data.priority_alert_strength = strength
+            
+    def add_processing_file(self, filename: str, process_type: str):
+        with self._lock:
+            if {'filename': filename, 'type': process_type} not in self._processing_files:
+                self._processing_files.append({'filename': filename, 'type': process_type})
+                print(f"APPSTATE: Added {filename} ({process_type}) to processing queue.")
+
+    def remove_processing_file(self, filename: str):
+        with self._lock:
+            initial_len = len(self._processing_files)
+            self._processing_files = [f for f in self._processing_files if f['filename'] != filename]
+            if len(self._processing_files) < initial_len:
+                print(f"APPSTATE: Removed {filename} from processing queue.")
