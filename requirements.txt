@@ -7,3 +7,4 @@ pyaudio
 pandas
 Pillow
 waitress
+pyserial

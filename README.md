@@ -30,7 +30,7 @@ From an ssh terminal, setup the environment:
 sudo apt-get install ffmpeg
 git clone https://github.com/KawaiiFiveO/RPi-V1-Dashcam.git
 cd RPi-V1-Dashcam
-python -m venv env
+python -m venv env --system-site-packages
 source env/bin/activate
 pip install -r requirements.txt
 ```
