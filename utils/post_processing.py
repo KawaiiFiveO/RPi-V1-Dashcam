@@ -11,9 +11,9 @@ import config
 
 def _escape_ffmpeg_text(text: str) -> str:
     """
-    Escapes special characters in a string for use in an ffmpeg drawtext filter.
-    Characters that need escaping include: ' : , [ ] \
+    Escapes special characters in a string for use in an ffmpeg filter file.
     """
+    # The order of replacement is important, especially for the backslash.
     text = text.replace('\\', '\\\\\\\\') # Must escape backslash for filter file
     text = text.replace("'", r"\'")
     text = text.replace(':', r'\:')
@@ -26,7 +26,7 @@ def burn_in_data(video_path: str, log_path: str):
     """
     Reads a CSV log file and burns the data as a text overlay onto the
     corresponding video file using ffmpeg. This version uses a complex filtergraph
-    to correctly handle video filtering alongside audio stream copying.
+    script to correctly handle video filtering alongside audio stream copying.
     """
     print(f"POST-PROCESS: Starting burn-in for {video_path}")
     
@@ -78,30 +78,30 @@ def burn_in_data(video_path: str, log_path: str):
 
         filter_chain = ",".join(filters)
         
-        # --- FIX: Construct a -filter_complex argument ---
-        # [0:v] is the video from the first input. We apply our filter chain to it.
-        # [v] is the label for the resulting filtered video stream.
-        # We also select the audio stream [0:a] to pass it through.
-        filter_complex_arg = f"[0:v]{filter_chain}[v];[0:a]acopy[a]"
+        # --- FIX: Construct the full complex filtergraph string for the file ---
+        filter_complex_content = f"[0:v]{filter_chain}[v];[0:a]acopy[a]"
+
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8') as f:
+            filter_script_file = f.name
+            f.write(filter_complex_content)
+        
+        print(f"POST-PROCESS: Complex filter script written to {filter_script_file}")
 
         output_path = video_path.replace('.mp4', '_processed.mp4')
         
-        # --- FIX: The new, robust ffmpeg command ---
+        # --- FIX: The new, robust ffmpeg command using -filter_complex_script ---
         command = [
             'ffmpeg', '-y', '-i', video_path,
-            '-filter_complex', filter_complex_arg,
-            '-map', '[v]',        # Map the filtered video stream to the output
-            '-map', '[a]',        # Map the copied audio stream to the output
-            '-c:v', 'libx264',    # Specify the encoder for the video stream
-            # We no longer need -c:a copy here, as it's handled by 'acopy' in the filter_complex
+            '-filter_complex_script', filter_script_file,
+            '-map', '[v]',
+            '-map', '[a]',
+            '-c:v', 'libx264',
             '-preset', 'fast',
             '-crf', '22',
             output_path
         ]
 
         print("POST-PROCESS: Running ffmpeg command. This may take a while...")
-        # For debugging, it can be helpful to see the full command
-        # print(" ".join(command)) 
         result = subprocess.run(command, capture_output=True, text=True)
 
         if result.returncode == 0:
@@ -114,3 +114,7 @@ def burn_in_data(video_path: str, log_path: str):
         print(f"POST-PROCESS: ERROR - Log file not found at {log_path}")
     except Exception as e:
         print(f"POST-PROCESS: An unexpected error occurred: {e}")
+    finally:
+        if filter_script_file and os.path.exists(filter_script_file):
+            os.remove(filter_script_file)
+            print(f"POST-PROCESS: Cleaned up temporary file {filter_script_file}")
