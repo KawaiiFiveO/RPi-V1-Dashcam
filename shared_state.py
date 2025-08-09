@@ -105,11 +105,11 @@ class AppState:
             self.v1_data.priority_alert_direction = direction
             self.v1_data.priority_alert_strength = strength
 
-    def update_v1_laser_alert(self):
+    def set_v1_laser_alert(self, direction: str, strength: int):
+        """Atomically sets a complete laser alert with correct direction and strength."""
         with self._lock:
             self.v1_data.in_alert = True
             self.v1_data.priority_alert_band = "Laser"
             self.v1_data.priority_alert_freq = 0.0
-            # Laser is always max strength and front-facing
-            self.v1_data.priority_alert_direction = "Front"
-            self.v1_data.priority_alert_strength = 8
+            self.v1_data.priority_alert_direction = direction
+            self.v1_data.priority_alert_strength = strength

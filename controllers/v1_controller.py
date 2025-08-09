@@ -379,25 +379,37 @@ class V1Controller:
         else:
             self.state.update_v1_alert_data(in_alert=False, band="N/A", freq=0.0)
 
+    # --- REWRITTEN _handle_display_data METHOD ---
     async def _handle_display_data(self, display_data: InfDisplayData):
-        """Callback to process display data (mode, direction, strength)."""
+        """
+        Callback to process display data. It is the SOLE source of direction/strength
+        and the primary source for laser alert detection.
+        """
         self.state.update_v1_mode(display_data.get_mode())
-        
-        # --- UPDATE LOGIC ---
-        # If an alert is active, update its direction and strength.
-        # Otherwise, clear them.
-        v1_data = self.state.get_v1_data() # Get a snapshot of the current state
-        if v1_data.in_alert:
+
+        # Determine if any alert is visually active in this packet
+        is_alert_active_in_packet = (display_data.is_laser() or 
+                                     display_data.is_ka() or 
+                                     display_data.is_k() or 
+                                     display_data.is_x())
+
+        if is_alert_active_in_packet:
+            # Always get the current direction and strength from the packet
             direction = self._get_direction_str(display_data)
             strength = display_data.get_num_leds()
-            self.state.update_v1_display_info(direction=direction, strength=strength)
+            
+            if display_data.is_laser():
+                # For laser, this packet is the only source of truth. Set the full alert.
+                self.state.set_v1_laser_alert(direction=direction, strength=strength)
+            else:
+                # For radar, band/freq are set by _handle_alerts. We only update display info.
+                self.state.update_v1_display_info(direction=direction, strength=strength)
         else:
-            # Ensure strength/direction are cleared if there's no alert
-            if v1_data.priority_alert_strength != 0:
-                 self.state.update_v1_display_info(direction="N/A", strength=0)
-        
-        if display_data.is_laser():
-            self.state.update_v1_laser_alert()
+            # If this packet shows no alert, but the state still thinks there is one,
+            # it means the alert just ended. Clear the display info.
+            # The full alert state will be cleared by _handle_alerts when the alert table is empty.
+            if self.state.get_v1_data().in_alert:
+                self.state.update_v1_display_info(direction="N/A", strength=0)
 
     async def _perform_startup_checks(self):
         """Requests version and sweep info from the V1 as a self-test."""
