@@ -56,10 +56,11 @@ def burn_in_data(video_path: str, log_path: str):
             escaped_ts = _escape_ffmpeg_text(ts_text)
         
             filters.append(
-                f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+                f"drawtext=font='Roboto':"
                 f"text='{escaped_ts}':"
                 f"x=w-tw-10:y=10:"
-                f"fontsize=24:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=5:"
+                f"fontsize=28:fontcolor=white:"
+                f"borderw=2:bordercolor=black@1:"
                 f"enable='between(t,{time_offset},{end_offset})'"
             )
         
@@ -74,10 +75,11 @@ def burn_in_data(video_path: str, log_path: str):
             escaped_gps_text = _escape_ffmpeg_text(gps_text)
             
             filters.append(
-                f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                f"text='{escaped_gps_text}':" # <-- Quotes are correct here
+                f"drawtext=font='Roboto':"
+                f"text='{escaped_gps_text}':"
                 f"x=10:y=10:"
-                f"fontsize=24:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=5:"
+                f"fontsize=28:fontcolor=white:"
+                f"borderw=2:bordercolor=black@1:"
                 f"enable='between(t,{time_offset},{end_offset})'"
             )
 
@@ -95,10 +97,11 @@ def burn_in_data(video_path: str, log_path: str):
             escaped_alert_text = _escape_ffmpeg_text(alert_text)
 
             filters.append(
-                f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+                f"drawtext=font='Roboto':"
                 f"text='{escaped_alert_text}':"
                 f"x=10:y=h-th-10:"
-                f"fontsize=28:fontcolor=yellow:box=1:boxcolor=black@0.5:boxborderw=5:"
+                f"fontsize=30:fontcolor=yellow:"
+                f"borderw=3:bordercolor=black@1:"
                 f"enable='between(t,{time_offset},{end_offset})'"
             )
 
