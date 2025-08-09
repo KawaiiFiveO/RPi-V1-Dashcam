@@ -432,9 +432,17 @@
                         const disabledClass = isProcessing ? 'disabled' : '';
                         const downloadVideoHref = isProcessing ? '#' : `/download/video/${file.name}`;
                         const downloadLogHref = isProcessing ? '#' : `/download/log/${file.log_name}`;
+                        
+                        // --- NEW: Generate analysis text and class ---
+                        let analysisText = '';
+                        let encounterClass = '';
+                        if (file.analysis && file.analysis.has_alerts) {
+                            analysisText = ` <span class="encounter-text">(Encounter: ${file.analysis.alert_points}/${file.analysis.total_points} points)</span>`;
+                            encounterClass = 'encounter';
+                        }
 
                         li.innerHTML = `
-                            <div class="file-info">${file.name} (${file.size})${processingText}</div>
+                            <div class="file-info">${file.name} (${file.size})${analysisText}${processingText}</div>
                             <div class="file-actions">
                                 <a href="${downloadVideoHref}" class="button ${disabledClass}" ${isProcessing ? 'onclick="return false;"' : ''}>Download Video</a>
                                 ${file.has_log ? `<a href="${downloadLogHref}" class="button ${disabledClass}" ${isProcessing ? 'onclick="return false;"' : ''}>Download Log</a>` : ''}
