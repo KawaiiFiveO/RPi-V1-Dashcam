@@ -181,7 +181,7 @@ def create_app(state: Optional[AppState], picam2: Optional[Picamera2], recorder_
         log_path = os.path.join(config.LOG_DIR, filename.replace('.mp4', '.csv'))
         if not os.path.exists(video_path) or not os.path.exists(log_path):
             return jsonify({'message': 'Video or log file not found.'}), 404
-        thread = threading.Thread(target=burn_in_data, args=(video_path, log_path))
+        thread = threading.Thread(target=burn_in_data, args=(video_path, log_path, state))
         thread.daemon = True
         thread.start()
         return jsonify({'message': f'Burn-in process started for {filename}. A new file ending in "_processed.mp4" will be created.'}), 202

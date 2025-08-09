@@ -37,6 +37,7 @@ class AppState:
         self.is_recording = False
         self.overlay_show_gps = True
         self.overlay_show_v1 = True
+        self._processing_files: List[Dict[str, str]] = [] 
 
     # --- Getters (unchanged) ---
     def get_v1_data(self) -> V1Data:
@@ -54,7 +55,10 @@ class AppState:
     def get_overlay_settings(self) -> dict:
         with self._lock:
             return {'show_gps': self.overlay_show_gps, 'show_v1': self.overlay_show_v1}
-
+    def get_processing_files(self) -> list[dict[str, str]]:
+        with self._lock:
+            # Return a copy to prevent external modification
+            return list(self._processing_files)
     # --- Setters (updated) ---
     def set_is_recording(self, status: bool):
         with self._lock:
