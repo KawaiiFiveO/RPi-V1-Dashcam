@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V1 Dashcam Control</title>
+    <style>
+        :root {
+            --primary-color: #1877f2;
+            --primary-hover: #166fe5;
+            --danger-color: #d93025;
+            --danger-hover: #c82333;
+            --background-color: #f0f2f5;
+            --container-bg: #ffffff;
+            --card-bg: #f7f7f7;
+            --text-color: #1c1e21;
+            --text-muted: #555;
+            --border-color: #ddd;
+            --alert-color: #d93025;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: var(--container-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .video-container {
+            text-align: center;
+            margin-bottom: 20px;
+            background: #000;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .video-container img {
+            max-width: 100%;
+            border-radius: 4px;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .status-card {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+        .status-card h3 {
+            margin-top: 0;
+            font-size: 1em;
+            color: var(--text-muted);
+        }
+        .status-card p {
+            margin: 5px 0;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: var(--text-color);
+            word-wrap: break-word;
+        }
+        .status-card .alert {
+            color: var(--alert-color);
+            font-weight: bold;
+        }
+        .file-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .file-list li {
+            background: #f9f9f9;
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .file-info {
+            font-weight: 500;
+        }
+        .file-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 5px;
+        }
+        button, .button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            text-decoration: none;
+            display: inline-block;
+            transition: background-color 0.2s;
+        }
+        button:hover, .button:hover {
+            background-color: var(--primary-hover);
+        }
+        .button-danger {
+            background-color: var(--danger-color);
+        }
+        .button-danger:hover {
+            background-color: var(--danger-hover);
+        }
+        .message {
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .settings-grid { display: flex; gap: 30px; align-items: center; flex-wrap: wrap; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 28px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--primary-color); }
+        input:checked + .slider:before { transform: translateX(22px); }
+        .preview-container {
+            position: relative; /* This is the anchor for the absolute overlay */
+            display: inline-block; /* Shrink-to-fit the image */
+            background: #000;
+            padding: 10px;
+            border-radius: 8px;
+            line-height: 0; /* Removes extra space below the image */
+        }
+        .preview-overlay {
+            position: absolute;
+            bottom: 10px; /* Position it 10px from the bottom of the container */
+            left: 10px;   /* Position it 10px from the left */
+            right: 10px;  /* Stretch to 10px from the right */
+            padding: 5px 8px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-family: monospace;
+            font-size: 14px;
+            border-radius: 4px;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>V1 Dashcam Control Center</h1>
+        <div id="message-box" class="message"></div>
+
+        <!-- Use Jinja2 templating to conditionally show these sections -->
+        {% if is_full_mode %}
+        <div class="section">
+            <h2>Controls</h2>
+            <div class="file-actions">
+                <button onclick="postAction('/actions/start_recording')">Start Recording</button>
+                <button onclick="postAction('/actions/stop_recording')" class="button-danger">Stop Recording</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Live Overlay Settings</h2>
+            <div class="settings-grid">
+                <div>
+                    <label for="gps-toggle">Show GPS Data</label>
+                    <label class="switch">
+                        <input type="checkbox" id="gps-toggle" onchange="updateOverlaySettings()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div>
+                    <label for="v1-toggle">Show V1 Alert Data</label>
+                    <label class="switch">
+                        <input type="checkbox" id="v1-toggle" onchange="updateOverlaySettings()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Live Status</h2>
+            <div id="status-container" class="status-grid">
+                <div class="status-card"><h3>Loading...</h3></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Live Preview</h2>
+            <!-- FIX: Wrap the video feed in the new preview container -->
+            <div class="preview-container">
+                <img src="{{ url_for('video_feed') }}" alt="Live Video Feed">
+                <!-- This div will be populated by JavaScript -->
+                <div id="preview-overlay-text" class="preview-overlay"></div>
+            </div>
+        </div>
+        {% else %}
+        <div class="section">
+            <h2>Web-Only Mode</h2>
+            <p>Running in file management mode. Live preview and recording controls are disabled.</p>
+        </div>
+        {% endif %}
+
+        <div class="section">
+            <h2>Recorded Clips</h2>
+            <ul id="file-list" class="file-list">
+                <li>Loading file list...</li>
+            </ul>
+            <button onclick="refreshFiles()">Refresh File List</button>
+        </div>
+    </div>
+
+    <script>
+        const messageBox = document.getElementById('message-box');
+        const isFullMode = {{ is_full_mode|tojson }};
+
+        function showMessage(text, isError = false) {
+            messageBox.textContent = text;
+            messageBox.style.backgroundColor = isError ? '#f8d7da' : '#e7f3ff';
+            messageBox.style.borderColor = isError ? '#f5c6cb' : '#b3d7ff';
+            messageBox.style.color = isError ? '#721c24' : '#004085';
+            messageBox.style.display = 'block';
+            setTimeout(() => { messageBox.style.display = 'none'; }, 5000);
+        }
+
+        async function postAction(url, body = {}) {
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const result = await response.json();
+                showMessage(result.message, !response.ok);
+                if (response.ok) {
+                    updateStatus();
+                }
+            } catch (error) {
+                showMessage('An error occurred: ' + error, true);
+            }
+        }
+
+        function burnIn(filename) {
+            if (confirm(`This will start a CPU-intensive burn-in process for ${filename}. The Pi will become slow. Are you sure?`)) {
+                postAction('/actions/burn_in', { filename: filename });
+            }
+        }
+
+        function updateOverlaySettings() {
+            const showGps = document.getElementById('gps-toggle').checked;
+            const showV1 = document.getElementById('v1-toggle').checked;
+            postAction('/actions/set_overlays', { show_gps: showGps, show_v1: showV1 });
+        }
+
+        async function updateStatus() {
+            if (!isFullMode) return;
+            try {
+                const response = await fetch('/status');
+                const status = await response.json();
+                const container = document.getElementById('status-container');
+                
+                const v1AlertClass = status.v1.in_alert ? 'alert' : '';
+                const recStatusText = status.recorder.is_recording ? 'RECORDING' : 'Idle';
+                const recStatusClass = status.recorder.is_recording ? 'alert' : '';
+                const v1ModeText = status.v1.is_connected ? (status.v1.in_alert ? 'ALERT' : status.v1.v1_mode) : 'Offline';
+                const v1AlertText = status.v1.in_alert ? `${status.v1.priority_alert_band} / ${status.v1.priority_alert_freq.toFixed(3)} GHz` : 'None';
+                const gpsText = status.gps.has_fix ? `${status.gps.num_sats} Satellites` : 'No Fix';
+
+                container.innerHTML = `
+                    <div class="status-card"><h3>Recorder</h3><p class="${recStatusClass}">${recStatusText}</p></div>
+                    <div class="status-card"><h3>V1 Status</h3><p class="${v1AlertClass}">${v1ModeText}</p></div>
+                    <div class="status-card"><h3>V1 Alert</h3><p class="${v1AlertClass}">${v1AlertText}</p></div>
+                    <div class="status-card"><h3>GPS</h3><p>${gpsText}</p></div>
+                `;
+
+                // --- NEW: LOGIC TO UPDATE THE JAVASCRIPT OVERLAY ---
+                const overlayDiv = document.getElementById('preview-overlay-text');
+                const overlayParts = [];
+                
+                // Always add timestamp
+                overlayParts.push(new Date().toLocaleTimeString('en-GB'));
+
+                // Check the state of the UI toggles
+                const showGps = document.getElementById('gps-toggle').checked;
+                const showV1 = document.getElementById('v1-toggle').checked;
+
+                if (showGps && status.gps.has_fix) {
+                    const speedInt = Math.round(status.gps.speed_mph);
+                    overlayParts.push(`${status.gps.latitude.toFixed(4)},${status.gps.longitude.toFixed(4)} | ${speedInt} MPH`);
+                }
+                if (showV1 && status.v1.in_alert) {
+                    overlayParts.push(`V1: ${status.v1.priority_alert_band} ${status.v1.priority_alert_freq.toFixed(3)}GHz`);
+                }
+
+                // Update the overlay text
+                overlayDiv.textContent = overlayParts.join(' | ');
+
+                // Update the toggle switches to match the state from the server
+                if (status.overlays) {
+                    document.getElementById('gps-toggle').checked = status.overlays.show_gps;
+                    document.getElementById('v1-toggle').checked = status.overlays.show_v1;
+                }
+            } catch (error) {
+                console.error('Error fetching status:', error);
+                document.getElementById('status-container').innerHTML = '<div class="status-card"><h3>Error loading status.</h3></div>';
+            }
+        }
+
+        async function refreshFiles() {
+            try {
+                const response = await fetch('/files');
+                const files = await response.json();
+                const list = document.getElementById('file-list');
+                list.innerHTML = '';
+                if (files.length === 0) {
+                    list.innerHTML = '<li>No recordings found.</li>';
+                } else {
+                    files.forEach(file => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <div class="file-info">${file.name} (${file.size})</div>
+                            <div class="file-actions">
+                                <a href="/download/video/${file.name}" class="button">Download Video</a>
+                                ${file.has_log ? `<a href="/download/log/${file.log_name}" class="button">Download Log</a>` : ''}
+                                ${file.has_log ? `<button onclick="burnIn('${file.name}')" class="button-danger">Burn-in Data</button>` : ''}
+                            </div>
+                        `;
+                        list.appendChild(li);
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching file list:', error);
+                document.getElementById('file-list').innerHTML = '<li>Error loading file list.</li>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (isFullMode) {
+                updateStatus();
+                setInterval(updateStatus, 2000);
+            }
+            refreshFiles();
+        });
+    </script>
+</body>
+</html>

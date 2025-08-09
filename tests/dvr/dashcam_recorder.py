@@ -24,7 +24,7 @@ BITRATE = 10000000
 TEXT_COLOR = (255, 255, 255)  # White
 TEXT_SIZE = 1.2
 TEXT_THICKNESS = 2
-TEXT_FONT = cv2.FONT_HERSHEY_DUPLEX
+TEXT_FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 def create_output_directory():
     """Create the output directory if it doesn't exist."""

@@ -15,15 +15,11 @@ V1_SERVICE_UUID = "92A0AFF4-9E05-11E2-AA59-F23C91AEC05E"
 V1_WRITE_CHAR_UUID = "92A0B6D4-9E05-11E2-AA59-F23C91AEC05E"
 V1_NOTIFY_CHAR_UUID = "92A0B2CE-9E05-11E2-AA59-F23C91AEC05E"
 
-# ESP (EScort Serial Protocol) framing and address bytes
+# ESP framing and address bytes
 ESP_SOF = 0xAA  # Start of Frame
 ESP_EOF = 0xAB  # End of Frame
 DEST_BASE = 0xD0  # Destination address base
 ORIG_BASE = 0xE0  # Origin address base
-
-# Minimum V1 firmware version required for custom sweep support
-MIN_SWEEP_FW_VERSION = 3.8950
-
 
 class DeviceId(IntEnum):
     """ESP Device identifiers."""

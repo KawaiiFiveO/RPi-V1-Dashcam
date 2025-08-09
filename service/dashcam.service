@@ -1,0 +1,39 @@
+# /etc/systemd/system/dashcam.service
+
+[Unit]
+Description=V1 Dashcam Application
+# This ensures the service starts after the network is available,
+# which is good practice for the web UI.
+After=network.target
+
+[Service]
+# Type=simple means the service is considered "started" as soon as
+# the ExecStart command is executed.
+Type=simple
+
+# --- IMPORTANT: YOU MUST CHANGE THESE VALUES ---
+# Replace 'myuser' with your actual username on the Raspberry Pi.
+User=myuser
+Group=myuser
+
+# Set the working directory to the root of your project.
+# Replace the path with the actual path to your RPi-V1-Dashcam folder.
+WorkingDirectory=/home/myuser/RPi-V1-Dashcam
+
+# The command to start the application.
+# This assumes you have a Python virtual environment named 'env' inside your project.
+ExecStart=/home/myuser/RPi-V1-Dashcam/env/bin/python /home/myuser/RPi-V1-Dashcam/main.py
+
+# Automatically restart the service if it fails.
+Restart=on-failure
+# Wait 10 seconds before attempting to restart.
+RestartSec=10
+
+# Redirect standard output and error to the systemd journal.
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+# This tells systemd to start the service when the system reaches
+# the multi-user state (i.e., a normal boot).
+WantedBy=multi-user.target

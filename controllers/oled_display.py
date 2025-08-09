@@ -1,0 +1,142 @@
+# RPi-V1-Dashcam/controllers/oled_display.py
+
+import time
+import os.path
+from luma.core.interface.serial import i2c
+from luma.core.render import canvas
+from luma.oled.device import ssd1306
+from PIL import ImageFont
+
+# Import shared application components
+from shared_state import AppState
+import config
+
+class OledDisplay:
+    """
+    A controller that manages the OLED screen, displaying real-time status
+    information by reading from the shared application state.
+    """
+    def __init__(self, state: AppState):
+        """
+        Initializes the OLED Display controller.
+        Args:
+            state: The shared application state object.
+        """
+        self.state = state
+        self.device = None
+        self.font_small = None
+        self.font_large = None
+
+        try:
+            # Initialize the I2C interface for the OLED
+            serial = i2c(port=config.OLED_I2C_PORT, address=config.OLED_I2C_ADDRESS)
+            
+            # Initialize the ssd1306 device with the correct dimensions
+            self.device = ssd1306(serial, width=config.OLED_WIDTH, height=config.OLED_HEIGHT)
+            
+            # Load fonts
+            self.font_small = self._get_font('pixelmix.ttf', 8)
+            self.font_large = self._get_font('pixelmix.ttf', 12) # For prominent info
+
+            print("OLEDDISPLAY: Initialized successfully.")
+            # Briefly show a startup message
+            with canvas(self.device) as draw:
+                draw.text((18, 10), "Dashcam Starting...", font=self.font_small, fill="white")
+            time.sleep(2)
+
+        except Exception as e:
+            print(f"OLEDDISPLAY: Error initializing display: {e}")
+            print("OLEDDISPLAY: Will not be used. Please ensure I2C is enabled and the screen is connected.")
+            self.device = None # Ensure device is None if setup fails
+
+    def _get_font(self, font_name: str, size: int):
+        """Loads a font from the project's 'fonts' directory."""
+        # This assumes a 'fonts' directory exists at the project root
+        font_path = os.path.join(config.BASE_DIR, 'fonts', font_name)
+        try:
+            return ImageFont.truetype(font_path, size)
+        except IOError:
+            print(f"OLEDDISPLAY: Font '{font_name}' not found at '{font_path}'. Falling back to default.")
+            return ImageFont.load_default()
+
+    def _draw_alert_screen(self, draw):
+        """Renders the display when a V1 alert is active."""
+        v1_data = self.state.get_v1_data()
+        
+        # Line 1: Big, bold alert band
+        band_text = f"ALERT: {v1_data.priority_alert_band}"
+        draw.text((0, 0), band_text, font=self.font_large, fill="white")
+
+        # Line 2: Frequency
+        if v1_data.priority_alert_freq > 0:
+            freq_text = f"{v1_data.priority_alert_freq:.3f} GHz"
+            draw.text((10, 14), freq_text, font=self.font_small, fill="white")
+        
+        # Line 3: Recording status
+        self._draw_status_line(draw, 24)
+
+    def _draw_normal_screen(self, draw):
+        """Renders the default display screen."""
+        v1_data = self.state.get_v1_data()
+        gps_data = self.state.get_gps_data()
+
+        # Line 1: V1 connection status and mode
+        v1_status = f"V1: {v1_data.v1_mode}" if v1_data.is_connected else "V1: Disconnected"
+        draw.text((0, 0), v1_status, font=self.font_small, fill="white")
+
+        # Line 2: GPS status and Speed
+        if gps_data.has_fix:
+            # Display speed next to satellite count
+            gps_status = f"GPS: {gps_data.num_sats} sats | {gps_data.speed_mph:.0f} MPH"
+        else:
+            gps_status = "GPS: No Fix"
+        draw.text((0, 8), gps_status, font=self.font_small, fill="white")
+
+        # Line 3: Lat/Lon if we have a fix
+        if gps_data.has_fix:
+            lat_lon_text = f"{gps_data.latitude:.4f}, {gps_data.longitude:.4f}"
+            draw.text((0, 16), lat_lon_text, font=self.font_small, fill="white")
+        
+        # Line 4: Recording status
+        self._draw_status_line(draw, 24)
+
+    def _draw_status_line(self, draw, y_pos):
+        """Draws the bottom status line showing recording status."""
+        if self.state.get_is_recording():
+            # Use a solid circle character (●) to indicate recording
+            rec_text = "REC ●"
+            draw.text((95, y_pos), rec_text, font=self.font_small, fill="white")
+
+    def run(self):
+        """
+        The main loop for the OLED display thread.
+        Continuously redraws the screen with the latest data from the shared state.
+        """
+        # If the device failed to initialize, this thread does nothing.
+        if not self.device:
+            return
+
+        while self.state.get_app_running():
+            try:
+                v1_data = self.state.get_v1_data()
+                
+                with canvas(self.device) as draw:
+                    if v1_data.in_alert:
+                        self._draw_alert_screen(draw)
+                    else:
+                        self._draw_normal_screen(draw)
+
+                # Control the refresh rate of the display
+                time.sleep(0.5)
+
+            except Exception as e:
+                print(f"OLEDDISPLAY: An error occurred in the display loop: {e}")
+                time.sleep(5) # Wait a bit before retrying
+
+        # Clear the display on shutdown
+        try:
+            self.device.clear()
+        except Exception as e:
+            print(f"OLEDDISPLAY: Could not clear display on exit: {e}")
+            
+        print("OLEDDISPLAY: Thread finished.")

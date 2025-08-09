@@ -4,3 +4,7 @@ luma.oled
 pynmea2
 Flask
 pyaudio
+pandas
+Pillow
+opencv-python
+waitress
