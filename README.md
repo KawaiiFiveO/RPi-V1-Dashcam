@@ -45,6 +45,12 @@ python main.py
 
 You can configure settings such as recording duration in `config.py`.
 
+To access files without starting the other dashcam functions:
+
+```
+python main.py --web-only
+```
+
 If you want it to run automatically, setup the service:
 
 ```
@@ -88,4 +94,6 @@ Replace `V1-Dashcam-Hotspot`, `MyHomeWifi`, and `MyPasswordHere` with your own v
 - OLED customization
 - improve web interface
 - fix video/audio desync
+- more detailed overlay
+- fix video timestamp
 - TEST EVERYTHING
