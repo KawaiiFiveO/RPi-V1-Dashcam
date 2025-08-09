@@ -52,7 +52,7 @@ AUDIO_CHANNELS = 1
 AUDIO_RATE = 44100
 
 # The number of frames per buffer. A power of 2 is common.
-AUDIO_CHUNK_SIZE = 1024
+AUDIO_CHUNK_SIZE = 4096
 
 # -----------------------------------------------------------------------------
 # --- GPS Module Configuration ---
