@@ -19,6 +19,8 @@ def _escape_ffmpeg_text(text: str) -> str:
     text = text.replace(',', r'\,')
     text = text.replace('[', r'\[')
     text = text.replace(']', r'\]')
+    # Escape the % character itself, as it's used for expression evaluation
+    text = text.replace('%', r'\%')
     return text
 
 def burn_in_data(video_path: str, log_path: str):
@@ -39,21 +41,20 @@ def burn_in_data(video_path: str, log_path: str):
         start_time = log_data['timestamp'].iloc[0]
         filters = []
 
-        # --- FIX: Add a dedicated, continuous timestamp filter ---
-        # This filter uses ffmpeg's internal `localtime` expansion.
-        # The colons in the time format must be escaped for the filter syntax.
-        # It is positioned in the top-right corner (w-tw-10).
+        # Convert start_time to epoch seconds (int)
+        start_epoch = int(start_time.timestamp())
+        
         timestamp_filter = (
-            "drawtext="
-            "fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            "text='%{{localtime:{start_time}:%Y-%m-%d %H\\:%M\\:%S}}':"
-            "x=w-tw-10:y=10:"
-            "fontsize=24:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=5"
-        ).format(start_time=start_time.timestamp())
+            "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+            "text='%{{localtime\\:{epoch}\\:%Y-%m-%d %H\\\\\\:%M\\\\\\:%S}}':"
+            "x=w-tw-10:y=10:fontsize=24:fontcolor=white:"
+            "box=1:boxcolor=black@0.5:boxborderw=5"
+        ).format(epoch=start_epoch)
+        
         filters.append(timestamp_filter)
         
-        # --- Filter for GPS Data ---
-        # Positioned at top-left (y=44, below the timestamp)
+        
+        # --- Filter for GPS Data (This one correctly keeps the quotes for literal text) ---
         gps_entries = log_data[log_data['latitude'] != 0.0]
         for _, row in gps_entries.iterrows():
             time_offset = (row['timestamp'] - start_time).total_seconds()
@@ -63,14 +64,13 @@ def burn_in_data(video_path: str, log_path: str):
             
             filters.append(
                 f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                f"text='{escaped_gps_text}':"
+                f"text='{escaped_gps_text}':" # <-- Quotes are correct here
                 f"x=10:y=44:"
                 f"fontsize=24:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=5:"
                 f"enable='between(t,{time_offset},{end_offset})'"
             )
 
-        # --- Filter for V1 Alert Data ---
-        # Positioned at bottom-left
+        # --- Filter for V1 Alert Data (This one also correctly keeps the quotes) ---
         alert_entries = log_data[log_data['v1_in_alert'] == True]
         for _, row in alert_entries.iterrows():
             time_offset = (row['timestamp'] - start_time).total_seconds()
@@ -80,7 +80,7 @@ def burn_in_data(video_path: str, log_path: str):
 
             filters.append(
                 f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                f"text='{escaped_alert_text}':"
+                f"text='{escaped_alert_text}':" # <-- Quotes are correct here
                 f"x=10:y=h-th-10:"
                 f"fontsize=28:fontcolor=yellow:box=1:boxcolor=black@0.5:boxborderw=5:"
                 f"enable='between(t,{time_offset},{end_offset})'"
