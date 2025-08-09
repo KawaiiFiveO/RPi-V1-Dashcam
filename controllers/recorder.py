@@ -3,7 +3,6 @@
 import os
 import sys
 import time
-import cv2
 import pyaudio
 import wave
 import csv

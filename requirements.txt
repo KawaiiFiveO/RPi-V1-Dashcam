@@ -6,5 +6,4 @@ Flask
 pyaudio
 pandas
 Pillow
-opencv-python
 waitress
