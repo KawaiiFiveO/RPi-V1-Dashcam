@@ -45,12 +45,6 @@ python main.py
 
 You can configure settings such as recording duration in `config.py`.
 
-To access files without starting the other dashcam functions:
-
-```
-python main.py --web-only
-```
-
 If you want it to run automatically, setup the service:
 
 ```
@@ -69,6 +63,12 @@ sudo systemctl start dashcam.service
 ### Web Interface
 
 When your Pi is connected to your home network, you can visit the webpage (at your Pi’s IP and port 5000) in your browser to start/stop recording and change settings.
+
+To access files without starting the other dashcam functions:
+
+```
+python main.py --web-only
+```
 
 To make the Pi start up its own network so that you can control the web interface even when it's not connected to a network:
 

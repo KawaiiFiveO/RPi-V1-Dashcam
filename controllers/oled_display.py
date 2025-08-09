@@ -94,7 +94,7 @@ class OledDisplay:
 
         # Line 3: Lat/Lon if we have a fix
         if gps_data.has_fix:
-            lat_lon_text = f"{gps_data.latitude:.4f}, {gps_data.longitude:.4f}"
+            lat_lon_text = f"{gps_data.latitude:.5f}, {gps_data.longitude:.5f}"
             draw.text((0, 16), lat_lon_text, font=self.font_small, fill="white")
         
         # Line 4: Recording status

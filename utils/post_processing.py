@@ -11,17 +11,21 @@ import config
 
 def _escape_ffmpeg_text(text: str) -> str:
     """
-    Escapes special characters in a string for use in an ffmpeg filter file.
+    Escapes special characters for use inside an ffmpeg drawtext literal text value.
+    This is for pre-rendered strings only (no %{...} expressions).
     """
-    text = text.replace('\\', '\\\\\\\\')
-    text = text.replace("'", r"\'")
-    text = text.replace(':', r'\:')
-    text = text.replace(',', r'\,')
-    text = text.replace('[', r'\[')
+    if not text:
+        return text
+
+    text = text.replace('\\', '\\\\\\\\')  # backslashes
+    text = text.replace("'", r"\'")        # single quotes
+    text = text.replace(',', r'\,')        # commas
+    text = text.replace('[', r'\[')        # brackets
     text = text.replace(']', r'\]')
-    # Escape the % character itself, as it's used for expression evaluation
-    text = text.replace('%', r'\%')
+    text = text.replace('%', r'\%')        # percent signs (rare but safe to escape)
+    text = text.replace(':', r'\:')        # colons (shouldn't be in new format, but just in case)
     return text
+
 
 def burn_in_data(video_path: str, log_path: str):
     """
@@ -42,30 +46,37 @@ def burn_in_data(video_path: str, log_path: str):
         filters = []
 
         # Convert start_time to epoch seconds (int)
-        start_epoch = int(start_time.timestamp())
+        timestamp_entries = log_data[['timestamp']].copy()
         
-        timestamp_filter = (
-            "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            "text='%{pts\\:hms}':"  # <-- Use a simple, known-working expression first
-            "x=w-tw-10:y=10:fontsize=24:fontcolor=white:"
-            "box=1:boxcolor=black@0.5:boxborderw=5"
-        )
+        for _, row in timestamp_entries.iterrows():
+            time_offset = (row['timestamp'] - start_time).total_seconds()
+            end_offset = time_offset + config.LOGGING_INTERVAL_SECONDS
+            # No colons, just to keep ffmpeg parser happy
+            ts_text = row['timestamp'].strftime("%Y-%m-%d_%H-%M-%S")
+            escaped_ts = _escape_ffmpeg_text(ts_text)
         
-        filters.append(timestamp_filter)
+            filters.append(
+                f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+                f"text='{escaped_ts}':"
+                f"x=w-tw-10:y=10:"
+                f"fontsize=24:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=5:"
+                f"enable='between(t,{time_offset},{end_offset})'"
+            )
         
+        #filters.append(timestamp_filter)
         
         # --- Filter for GPS Data (This one correctly keeps the quotes for literal text) ---
         gps_entries = log_data[log_data['latitude'] != 0.0]
         for _, row in gps_entries.iterrows():
             time_offset = (row['timestamp'] - start_time).total_seconds()
             end_offset = time_offset + config.LOGGING_INTERVAL_SECONDS
-            gps_text = f"GPS: {row['latitude']:.4f}, {row['longitude']:.4f} | Sats: {int(row['sats'])} | Speed: {row['speed_mph']:.0f} MPH"
+            gps_text = f"GPS: {row['latitude']:.5f}, {row['longitude']:.5f} | Sats: {int(row['sats'])} | Speed: {row['speed_mph']:.0f} MPH"
             escaped_gps_text = _escape_ffmpeg_text(gps_text)
             
             filters.append(
                 f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
                 f"text='{escaped_gps_text}':" # <-- Quotes are correct here
-                f"x=10:y=44:"
+                f"x=10:y=10:"
                 f"fontsize=24:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=5:"
                 f"enable='between(t,{time_offset},{end_offset})'"
             )
