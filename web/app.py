@@ -18,6 +18,7 @@ import config
 
 # The post_processing utility is imported here but will only be used by a background thread
 from utils.post_processing import burn_in_data
+from utils.log_analyzer import analyze_log_file
 
 # Forward-declare the Recorder type for type hinting to avoid circular imports
 from typing import TYPE_CHECKING
@@ -107,11 +108,20 @@ def create_app(state: Optional[AppState], picam2: Optional[Picamera2], recorder_
             for f in video_files:
                 base_name = f.replace('.mp4', '')
                 log_name = f"{base_name}.csv"
+                log_path = os.path.join(config.LOG_DIR, log_name)
+                has_log = os.path.exists(log_path)
+
+                # --- CALL THE ANALYZER ---
+                analysis_results = analyze_log_file(log_path) if has_log else {
+                    'has_alerts': False, 'alert_points': 0, 'total_points': 0
+                }
+
                 file_info = {
                     'name': f,
                     'size': f"{os.path.getsize(os.path.join(config.VIDEO_DIR, f)) / 1_000_000:.2f} MB",
                     'log_name': log_name,
-                    'has_log': os.path.exists(os.path.join(config.LOG_DIR, log_name))
+                    'has_log': has_log,
+                    'analysis': analysis_results # --- ADD RESULTS TO RESPONSE ---
                 }
                 file_list.append(file_info)
             return jsonify(file_list)

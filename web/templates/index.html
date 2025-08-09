@@ -164,6 +164,16 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        .file-list li.encounter {
+            border-left: 4px solid var(--danger-color);
+            background-color: #fff5f5;
+        }
+        .encounter-text {
+            color: var(--danger-color);
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
@@ -345,8 +355,18 @@
                 } else {
                     files.forEach(file => {
                         const li = document.createElement('li');
+                        // --- NEW: Generate analysis text and class ---
+                        let analysisText = '';
+                        let encounterClass = '';
+                        if (file.analysis && file.analysis.has_alerts) {
+                            analysisText = ` <span class="encounter-text">(Encounter: ${file.analysis.alert_points}/${file.analysis.total_points} points)</span>`;
+                            encounterClass = 'encounter';
+                        }
+                        
+                        // --- Apply the class to the li element ---
+                        li.className = encounterClass;
                         li.innerHTML = `
-                            <div class="file-info">${file.name} (${file.size})</div>
+                            <div class="file-info">${file.name} (${file.size})${analysisText}</div>
                             <div class="file-actions">
                                 <a href="/download/video/${file.name}" class="button">Download Video</a>
                                 ${file.has_log ? `<a href="/download/log/${file.log_name}" class="button">Download Log</a>` : ''}
