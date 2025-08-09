@@ -82,6 +82,22 @@ class ESPPacket:
 
 class InfDisplayData(ESPPacket):
     """Parses and provides access to V1 display data."""
+    # --- ADDED METHODS ---
+    def get_num_leds(self) -> int:
+        """Returns the number of lit LEDs in the signal strength meter (0-8)."""
+        strength_byte = self.payload[2]
+        return bin(strength_byte).count('1')
+        
+    def is_front(self) -> bool:
+        return bool(self.payload[3] & 0b00100000)
+
+    def is_side(self) -> bool:
+        return bool(self.payload[3] & 0b01000000)
+
+    def is_rear(self) -> bool:
+        return bool(self.payload[3] & 0b10000000)
+    # --- END ADDED METHODS ---
+
     def is_laser(self) -> bool:
         return bool((self.payload[5] & 0b00000100) and (self.payload[3] & 0b00000001))
     def is_ka(self) -> bool:
@@ -332,6 +348,7 @@ class V1Controller:
         self.main_task: Optional[asyncio.Task] = None
 
     def _get_band_from_freq(self, freq_mhz: int) -> str:
+        # ... (this method is unchanged) ...
         if 10500 <= freq_mhz <= 10550:
             return "X"
         if 24050 <= freq_mhz <= 24250:
@@ -342,26 +359,44 @@ class V1Controller:
             return "Laser"
         return "Unknown"
 
+    # --- NEW HELPER METHOD ---
+    def _get_direction_str(self, display_data: InfDisplayData) -> str:
+        """Constructs a direction string (e.g., F, R, F/S) from display data."""
+        dirs = []
+        if display_data.is_front(): dirs.append("F")
+        if display_data.is_side(): dirs.append("S")
+        if display_data.is_rear(): dirs.append("R")
+        return "/".join(dirs) if dirs else "N/A"
+
     async def _handle_alerts(self, alerts: List[AlertData]):
-        """Callback to process alert data and update the shared state."""
+        """Callback to process alert data (freq, band) and update the shared state."""
         priority_alert = next((a for a in alerts if a.is_priority), None)
 
         if priority_alert:
             freq_ghz = priority_alert.frequency / 1000.0
             band = self._get_band_from_freq(priority_alert.frequency)
-            # Use the new atomic update method
             self.state.update_v1_alert_data(in_alert=True, band=band, freq=freq_ghz)
         else:
-            # Use the new atomic update method to clear the alert
             self.state.update_v1_alert_data(in_alert=False, band="N/A", freq=0.0)
 
     async def _handle_display_data(self, display_data: InfDisplayData):
-        """Callback to process general display data, like V1 mode."""
-        # Use the new atomic update method
+        """Callback to process display data (mode, direction, strength)."""
         self.state.update_v1_mode(display_data.get_mode())
         
+        # --- UPDATE LOGIC ---
+        # If an alert is active, update its direction and strength.
+        # Otherwise, clear them.
+        v1_data = self.state.get_v1_data() # Get a snapshot of the current state
+        if v1_data.in_alert:
+            direction = self._get_direction_str(display_data)
+            strength = display_data.get_num_leds()
+            self.state.update_v1_display_info(direction=direction, strength=strength)
+        else:
+            # Ensure strength/direction are cleared if there's no alert
+            if v1_data.priority_alert_strength != 0:
+                 self.state.update_v1_display_info(direction="N/A", strength=0)
+        
         if display_data.is_laser():
-            # Use the new atomic update method for laser alerts
             self.state.update_v1_laser_alert()
 
     async def _perform_startup_checks(self):

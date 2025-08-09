@@ -11,6 +11,9 @@ class V1Data:
     in_alert: bool = False
     priority_alert_freq: float = 0.0
     priority_alert_band: str = "N/A"
+    # --- NEW FIELDS ---
+    priority_alert_direction: str = "N/A"
+    priority_alert_strength: int = 0
     v1_mode: str = "Standby"
 
 @dataclass
@@ -35,11 +38,10 @@ class AppState:
         self.overlay_show_gps = True
         self.overlay_show_v1 = True
 
-    # --- Getters (These are safe as they are read-only) ---
+    # --- Getters (unchanged) ---
     def get_v1_data(self) -> V1Data:
         with self._lock:
             return self.v1_data
-    # ... (other getters are the same) ...
     def get_gps_data(self) -> GpsData:
         with self._lock:
             return self.gps_data
@@ -53,7 +55,7 @@ class AppState:
         with self._lock:
             return {'show_gps': self.overlay_show_gps, 'show_v1': self.overlay_show_v1}
 
-    # --- Setters (Now more specific and atomic) ---
+    # --- Setters (updated) ---
     def set_is_recording(self, status: bool):
         with self._lock:
             self.is_recording = status
@@ -68,35 +70,46 @@ class AppState:
         with self._lock:
             self.gps_data = new_data
 
-    # --- NEW ATOMIC UPDATE METHODS FOR V1 ---
+    # --- ATOMIC UPDATE METHODS FOR V1 ---
     def set_v1_connection_status(self, is_connected: bool):
-        """Atomically updates the V1 connection status and resets state on disconnect."""
         with self._lock:
             self.v1_data.is_connected = is_connected
             if not is_connected:
-                # If we are disconnecting, reset all other V1 fields
                 self.v1_data.in_alert = False
                 self.v1_data.v1_mode = "Standby"
                 self.v1_data.priority_alert_band = "N/A"
                 self.v1_data.priority_alert_freq = 0.0
+                # --- RESET NEW FIELDS ---
+                self.v1_data.priority_alert_direction = "N/A"
+                self.v1_data.priority_alert_strength = 0
 
     def update_v1_alert_data(self, in_alert: bool, band: str, freq: float):
-        """Atomically updates the V1 alert information."""
         with self._lock:
             self.v1_data.in_alert = in_alert
             self.v1_data.priority_alert_band = band
             self.v1_data.priority_alert_freq = freq
+            if not in_alert:
+                # If alert is cleared, also clear direction/strength
+                self.v1_data.priority_alert_direction = "N/A"
+                self.v1_data.priority_alert_strength = 0
 
     def update_v1_mode(self, mode: str):
-        """Atomically updates the V1's current mode."""
         with self._lock:
-            # Only update the mode if not in an alert, to prevent overwriting alert status
             if not self.v1_data.in_alert:
                 self.v1_data.v1_mode = mode
 
+    # --- NEW ATOMIC UPDATE METHOD ---
+    def update_v1_display_info(self, direction: str, strength: int):
+        """Atomically updates the V1 direction and strength from display data."""
+        with self._lock:
+            self.v1_data.priority_alert_direction = direction
+            self.v1_data.priority_alert_strength = strength
+
     def update_v1_laser_alert(self):
-        """Atomically sets a laser alert."""
         with self._lock:
             self.v1_data.in_alert = True
             self.v1_data.priority_alert_band = "Laser"
             self.v1_data.priority_alert_freq = 0.0
+            # Laser is always max strength and front-facing
+            self.v1_data.priority_alert_direction = "Front"
+            self.v1_data.priority_alert_strength = 8

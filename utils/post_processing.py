@@ -86,12 +86,17 @@ def burn_in_data(video_path: str, log_path: str):
         for _, row in alert_entries.iterrows():
             time_offset = (row['timestamp'] - start_time).total_seconds()
             end_offset = time_offset + config.LOGGING_INTERVAL_SECONDS
-            alert_text = f"V1 ALERT: {row['v1_band']} / {row['v1_freq_ghz']:.3f} GHz"
+            
+            # --- CONSTRUCT NEW ALERT TEXT ---
+            alert_text = (
+                f"V1 ALERT: {row['v1_band']} / {row['v1_freq_ghz']:.3f} GHz | "
+                f"Dir: {row['v1_direction']} | Str: {int(row['v1_strength'])}"
+            )
             escaped_alert_text = _escape_ffmpeg_text(alert_text)
 
             filters.append(
                 f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                f"text='{escaped_alert_text}':" # <-- Quotes are correct here
+                f"text='{escaped_alert_text}':"
                 f"x=10:y=h-th-10:"
                 f"fontsize=28:fontcolor=yellow:box=1:boxcolor=black@0.5:boxborderw=5:"
                 f"enable='between(t,{time_offset},{end_offset})'"

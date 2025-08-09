@@ -214,7 +214,11 @@ class Recorder:
             print("RECORDER: Audio recording thread finished.")
 
     def _log_data_clip(self, output_path: str):
-        header = ['timestamp', 'latitude', 'longitude', 'altitude', 'sats', 'speed_mph', 'v1_in_alert', 'v1_freq_ghz', 'v1_band']
+        # --- ADD NEW HEADERS ---
+        header = [
+            'timestamp', 'latitude', 'longitude', 'altitude', 'sats', 'speed_mph', 
+            'v1_in_alert', 'v1_freq_ghz', 'v1_band', 'v1_direction', 'v1_strength'
+        ]
         try:
             with open(output_path, 'w', newline='') as f:
                 writer = csv.writer(f)
@@ -222,7 +226,14 @@ class Recorder:
                 while self.is_logging_thread_running.is_set():
                     gps_data = self.state.get_gps_data()
                     v1_data = self.state.get_v1_data()
-                    writer.writerow([datetime.now().isoformat(), gps_data.latitude, gps_data.longitude, gps_data.altitude, gps_data.num_sats, gps_data.speed_mph, v1_data.in_alert, v1_data.priority_alert_freq, v1_data.priority_alert_band])
+                    # --- ADD NEW DATA TO THE ROW ---
+                    writer.writerow([
+                        datetime.now().isoformat(), 
+                        gps_data.latitude, gps_data.longitude, gps_data.altitude, 
+                        gps_data.num_sats, gps_data.speed_mph, 
+                        v1_data.in_alert, v1_data.priority_alert_freq, v1_data.priority_alert_band,
+                        v1_data.priority_alert_direction, v1_data.priority_alert_strength
+                    ])
                     time.sleep(config.LOGGING_INTERVAL_SECONDS)
         except Exception as e:
             print(f"RECORDER: CRITICAL ERROR during data logging: {e}")
