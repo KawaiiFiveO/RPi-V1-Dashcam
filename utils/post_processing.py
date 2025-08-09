@@ -46,7 +46,7 @@ def burn_in_data(video_path: str, log_path: str):
         timestamp_filter = (
             "drawtext="
             "fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            "text='%{{localtime\\:{start_time}:%Y-%m-%d %H\\:%M\\:%S}}':"
+            "text='%{{localtime:{start_time}:%Y-%m-%d %H\\:%M\\:%S}}':"
             "x=w-tw-10:y=10:"
             "fontsize=24:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=5"
         ).format(start_time=start_time.timestamp())
