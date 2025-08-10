@@ -74,19 +74,37 @@ h1 {
 .preview-container img {
     max-width: 100%;
 }
-.preview-overlay {
+.preview-overlay-item {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 8px 12px;
-    background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0));
+    padding: 5px 8px;
+    background-color: rgba(0, 0, 0, 0.6);
     color: white;
     font-family: monospace;
     font-size: 14px;
+    border-radius: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    /* Hide by default, JS will show them */
+    display: none; 
+}
+
+#overlay-gps {
+    top: 10px;
+    left: 10px;
+}
+
+#overlay-timestamp {
+    top: 10px;
+    right: 10px;
+    text-align: right;
+}
+
+#overlay-v1-alert {
+    bottom: 10px;
+    left: 10px;
+    color: #ffc107; /* A nice, readable yellow */
+    font-weight: bold;
 }
 
 /* --- Status Grid --- */

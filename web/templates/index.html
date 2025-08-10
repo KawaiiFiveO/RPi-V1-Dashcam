@@ -65,7 +65,9 @@
                     <div id="preview-wrapper">
                         <div class="preview-container" id="preview-container">
                             <img src="{{ url_for('video_feed') }}" alt="Live Video Feed" id="video-feed-img">
-                            <div id="preview-overlay-text" class="preview-overlay"></div>
+                            <div id="overlay-gps" class="preview-overlay-item"></div>
+                            <div id="overlay-timestamp" class="preview-overlay-item"></div>
+                            <div id="overlay-v1-alert" class="preview-overlay-item"></div>
                         </div>
                         <div class="preview-placeholder" id="preview-placeholder">
                             <p><i class="fa-solid fa-eye-slash"></i></p>
@@ -204,20 +206,36 @@
                     <div class="status-card"><h3>GPS</h3><p>${gpsText}</p></div>
                 `;
 
-                const overlayDiv = document.getElementById('preview-overlay-text');
-                const overlayParts = [];
-                overlayParts.push(new Date().toLocaleTimeString('en-GB'));
+                const overlayGps = document.getElementById('overlay-gps');
+                const overlayTimestamp = document.getElementById('overlay-timestamp');
+                const overlayV1 = document.getElementById('overlay-v1-alert');
+
                 const showGps = document.getElementById('gps-toggle').checked;
                 const showV1 = document.getElementById('v1-toggle').checked;
+
+                // 1. Update GPS Overlay (Top Left)
                 if (showGps && status.gps.has_fix) {
                     const speedInt = Math.round(status.gps.speed_mph);
-                    overlayParts.push(`${status.gps.latitude.toFixed(4)},${status.gps.longitude.toFixed(4)} | ${speedInt} MPH`);
+                    overlayGps.textContent = `GPS: ${status.gps.latitude.toFixed(5)}, ${status.gps.longitude.toFixed(5)} | ${speedInt} MPH`;
+                    overlayGps.style.display = 'block';
+                } else {
+                    overlayGps.style.display = 'none';
                 }
-                if (showV1 && status.v1.in_alert) {
-                    overlayParts.push(`V1: ${status.v1.priority_alert_band} ${status.v1.priority_alert_freq.toFixed(3)}GHz | Dir: ${status.v1.priority_alert_direction} | Str: ${status.v1.priority_alert_strength}`);
-                }
-                overlayDiv.textContent = overlayParts.join(' | ');
 
+                // 2. Update Timestamp Overlay (Top Right)
+                // 'sv-SE' locale gives a nice YYYY-MM-DD HH:MM:SS format
+                overlayTimestamp.textContent = new Date().toLocaleString('sv-SE');
+                overlayTimestamp.style.display = 'block';
+
+                // 3. Update V1 Alert Overlay (Bottom Left)
+                if (showV1 && status.v1.in_alert) {
+                    overlayV1.textContent = `V1 ALERT: ${status.v1.priority_alert_band} / ${status.v1.priority_alert_freq.toFixed(3)}GHz | Dir: ${status.v1.priority_alert_direction} | Str: ${status.v1.priority_alert_strength}`;
+                    overlayV1.style.display = 'block';
+                } else {
+                    overlayV1.style.display = 'none';
+                }
+
+                // Update the toggle switches to match the state from the server
                 if (status.overlays) {
                     document.getElementById('gps-toggle').checked = status.overlays.show_gps;
                     document.getElementById('v1-toggle').checked = status.overlays.show_v1;
