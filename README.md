@@ -93,7 +93,6 @@ Replace `V1-Dashcam-Hotspot`, `MyHomeWifi`, and `MyPasswordHere` with your own v
 - better documentation/writeup
 - OLED customization
 - improve web interface
-- fix video/audio desync
-- more detailed overlay
+- improve overlay visuals
 - make audio optional
 - TEST EVERYTHING
