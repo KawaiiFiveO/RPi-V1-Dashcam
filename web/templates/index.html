@@ -440,6 +440,8 @@
                             analysisText = ` <span class="encounter-text">(Encounter: ${file.analysis.alert_points}/${file.analysis.total_points} points)</span>`;
                             encounterClass = 'encounter';
                         }
+                        
+                        li.className = encounterClass;
 
                         li.innerHTML = `
                             <div class="file-info">${file.name} (${file.size})${analysisText}${processingText}</div>
