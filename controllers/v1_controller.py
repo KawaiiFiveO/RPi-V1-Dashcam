@@ -197,11 +197,13 @@ class V1BleakClient:
     async def scan(self) -> Optional[BLEDevice]:
         print("V1CLIENT: Scanning for V1 devices...")
         try:
-            device = await BleakScanner.find_device_by_filter(
-                lambda d, ad: ad.service_uuids and config.V1_SERVICE_UUID.lower() in ad.service_uuids,
-                timeout=10.0
-            )
-            return device
+            # --- FIX: Use discover() for more reliability in noisy areas ---
+            # Increase timeout to 20 seconds
+            devices = await BleakScanner.discover(service_uuids=[config.V1_SERVICE_UUID], timeout=20.0)
+            if devices:
+                print(f"V1CLIENT: Found {len(devices)} V1 device(s). Connecting to the first one.")
+                return devices[0]
+            return None # No devices found
         except Exception as e:
             print(f"V1CLIENT: Error during BLE scan: {e}")
             return None
@@ -431,30 +433,42 @@ class V1Controller:
         """The asynchronous core of the controller."""
         try:
             while self.state.get_app_running():
+                # --- FIX: Check for manual reconnect request ---
+                if self.state.get_and_clear_v1_reconnect_request():
+                    print("V1CONTROLLER: Manual reconnect triggered.")
+                    if self.v1_client.client and self.v1_client.client.is_connected:
+                        await self.v1_client.disconnect()
+                
+                self.state.set_v1_connection_status(False, "Scanning")
                 device = await self.v1_client.scan()
+                
                 if not device:
                     print("V1CONTROLLER: No V1 device found. Retrying in 15 seconds...")
+                    self.state.set_v1_connection_status(False, "Disconnected")
                     await asyncio.sleep(15)
                     continue
+                
                 try:
+                    self.state.set_v1_connection_status(False, "Connecting")
                     if await self.v1_client.connect(device):
-                        # --- FIX IS HERE: Use the new atomic method ---
-                        self.state.set_v1_connection_status(True)
+                        self.state.set_v1_connection_status(True, "Connected")
                         
                         await self._perform_startup_checks()
                         await self.v1_client.start_alert_data()
                         
                         while self.state.get_app_running() and self.v1_client.client.is_connected:
+                            # --- FIX: Check for manual reconnect request inside connected loop ---
+                            if self.state.get_and_clear_v1_reconnect_request():
+                                print("V1CONTROLLER: Manual reconnect triggered while connected.")
+                                break # Break inner loop to force disconnect and rescan
                             await asyncio.sleep(1)
+
                 except BleakError as e:
                     print(f"V1CONTROLLER: A Bluetooth error occurred: {e}")
                 finally:
                     print("V1CONTROLLER: Cleaning up connection...")
                     await self.v1_client.disconnect()
-                    
-                    # --- FIX IS HERE: Use the new atomic method ---
-                    # This will also reset the other V1 fields correctly.
-                    self.state.set_v1_connection_status(False)
+                    self.state.set_v1_connection_status(False, "Disconnected")
                     
                     if self.state.get_app_running():
                         print("V1CONTROLLER: Connection lost. Will attempt to reconnect...")

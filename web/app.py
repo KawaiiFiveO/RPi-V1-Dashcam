@@ -186,6 +186,15 @@ def create_app(state: Optional[AppState], picam2: Optional[Picamera2], recorder_
         thread.start()
         return jsonify({'message': f'Burn-in process started for {filename}. A new file ending in "_processed.mp4" will be created.'}), 202
         
+    @app.route('/actions/reconnect_v1', methods=['POST'])
+    def action_reconnect_v1():
+        if not is_full_mode:
+            return jsonify({'message': 'Cannot reconnect in web-only mode.'}), 403
+        
+        print("WEB: Manual V1 reconnect requested.")
+        state.set_v1_reconnect_request()
+        return jsonify({'message': 'V1 reconnect signal sent. Check status for updates.'}), 202
+        
     @app.route('/actions/shutdown_pi', methods=['POST'])
     def action_shutdown_pi():
         if not is_full_mode:

@@ -8,10 +8,11 @@ from typing import Optional
 class V1Data:
     """Holds the current state of the Valentine One detector."""
     is_connected: bool = False
+    connection_status: str = "Disconnected" # Disconnected, Scanning, Connecting, Connected
+    in_alert: bool = False
     in_alert: bool = False
     priority_alert_freq: float = 0.0
     priority_alert_band: str = "N/A"
-    # --- NEW FIELDS ---
     priority_alert_direction: str = "N/A"
     priority_alert_strength: int = 0
     v1_mode: str = "Standby"
@@ -20,6 +21,7 @@ class V1Data:
 class GpsData:
     """Holds the current state of the GPS module."""
     has_fix: bool = False
+    status: str = "Initializing"
     latitude: float = 0.0
     longitude: float = 0.0
     altitude: float = 0.0
@@ -32,7 +34,8 @@ class AppState:
         
         self.v1_data = V1Data()
         self.gps_data = GpsData()
-        
+
+        self.v1_reconnect_request = False
         self.app_running = True
         self.is_recording = False
         self.overlay_show_gps = True
@@ -75,15 +78,16 @@ class AppState:
             self.gps_data = new_data
 
     # --- ATOMIC UPDATE METHODS FOR V1 ---
-    def set_v1_connection_status(self, is_connected: bool):
+    def set_v1_connection_status(self, is_connected: bool, status: str):
+        """Atomically updates the V1 connection status."""
         with self._lock:
             self.v1_data.is_connected = is_connected
+            self.v1_data.connection_status = status
             if not is_connected:
                 self.v1_data.in_alert = False
                 self.v1_data.v1_mode = "Standby"
                 self.v1_data.priority_alert_band = "N/A"
                 self.v1_data.priority_alert_freq = 0.0
-                # --- RESET NEW FIELDS ---
                 self.v1_data.priority_alert_direction = "N/A"
                 self.v1_data.priority_alert_strength = 0
 
@@ -130,3 +134,13 @@ class AppState:
             self._processing_files = [f for f in self._processing_files if f['filename'] != filename]
             if len(self._processing_files) < initial_len:
                 print(f"APPSTATE: Removed {filename} from processing queue.")
+                
+    def get_and_clear_v1_reconnect_request(self) -> bool:
+        with self._lock:
+            request = self.v1_reconnect_request
+            self.v1_reconnect_request = False
+            return request
+
+    def set_v1_reconnect_request(self):
+        with self._lock:
+            self.v1_reconnect_request = True

@@ -22,6 +22,7 @@
                     <div class="actions-grid">
                         <button onclick="postAction('/actions/start_recording')"><i class="fa-solid fa-play"></i> Start Recording</button>
                         <button onclick="postAction('/actions/stop_recording')" class="button-danger"><i class="fa-solid fa-stop"></i> Stop Recording</button>
+                        <button onclick="postAction('/actions/reconnect_v1')"><i class="fa-solid fa-arrows-rotate"></i> Reconnect V1</button>
                     </div>
                 </div>
 
@@ -191,19 +192,22 @@
                 const v1AlertClass = status.v1.in_alert ? 'alert' : '';
                 const recStatusText = status.recorder.is_recording ? 'RECORDING' : 'Idle';
                 const recStatusClass = status.recorder.is_recording ? 'recording' : '';
-                const v1ModeText = status.v1.is_connected ? (status.v1.in_alert ? 'ALERT' : status.v1.v1_mode) : 'Offline';
+                
+                // --- USE NEW DETAILED STATUSES ---
+                const v1ConnectionText = status.v1.connection_status; 
+                const gpsStatusText = status.gps.status;
+                
                 const v1AlertText = status.v1.in_alert ? `${status.v1.priority_alert_band} / ${status.v1.priority_alert_freq.toFixed(3)}` : 'None';
-                const gpsText = status.gps.has_fix ? `${status.gps.num_sats} Sats` : 'No Fix';
                 const v1DirText = status.v1.in_alert ? status.v1.priority_alert_direction : '–';
                 const v1StrText = status.v1.in_alert ? status.v1.priority_alert_strength : '0';
 
                 container.innerHTML = `
                     <div class="status-card"><h3>Recorder</h3><p class="${recStatusClass}">${recStatusText}</p></div>
-                    <div class="status-card"><h3>V1 Status</h3><p class="${v1AlertClass}">${v1ModeText}</p></div>
+                    <div class="status-card"><h3>V1 Status</h3><p class="${v1AlertClass}">${v1ConnectionText}</p></div>
+                    <div class="status-card"><h3>GPS Status</h3><p>${gpsStatusText}</p></div>
                     <div class="status-card"><h3>V1 Alert</h3><p class="${v1AlertClass}">${v1AlertText}</p></div>
                     <div class="status-card"><h3>Direction</h3><p class="${v1AlertClass}">${v1DirText}</p></div>
                     <div class="status-card"><h3>Strength</h3><p class="${v1AlertClass}">${v1StrText}</p></div>
-                    <div class="status-card"><h3>GPS</h3><p>${gpsText}</p></div>
                 `;
 
                 const overlayGps = document.getElementById('overlay-gps');

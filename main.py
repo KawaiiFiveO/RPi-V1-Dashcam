@@ -16,7 +16,7 @@ from web.app import create_app
 
 def run_full_mode():
     """
-    Runs the dashcam in full operational mode with all controllers.
+    Runs the dashcam in full operational mode with a watchdog to restart failed threads.
     """
     print("--- V1 Dashcam Application Starting (Full Mode) ---")
     
@@ -33,45 +33,58 @@ def run_full_mode():
         sys.exit(1)
     print("MAIN: Controllers initialized.")
 
-    threads = {
-        "recorder": threading.Thread(target=recorder.run, daemon=True),
-        "v1": threading.Thread(target=v1_controller.run, daemon=True),
-        "gps": threading.Thread(target=gps_reader.run, daemon=True),
-        "oled": threading.Thread(target=oled_display.run, daemon=True),
+    # --- Watchdog Setup ---
+    # Store not just the thread, but how to recreate it.
+    monitored_threads = {
+        "recorder": {"target": recorder.run, "thread": None},
+        "v1": {"target": v1_controller.run, "thread": None},
+        "gps": {"target": gps_reader.run, "thread": None},
+        "oled": {"target": oled_display.run, "thread": None},
     }
 
-    for name, thread in threads.items():
-        print(f"MAIN: Starting thread for {name}...")
-        thread.start()
-
+    # The web server is handled separately as it's critical.
     web_app = create_app(state, recorder.picam2, recorder)
+    http_server_thread = None
+
+    def start_web_server():
+        nonlocal http_server_thread
+        print("MAIN: (Re)starting web server thread...")
+        http_server_thread = threading.Thread(
+            target=lambda: serve(web_app, host=config.WEB_SERVER_HOST, port=config.WEB_SERVER_PORT),
+            daemon=True
+        )
+        http_server_thread.start()
+        print(f"MAIN: Web server started on http://{config.WEB_SERVER_HOST}:{config.WEB_SERVER_PORT}")
+
+    # Initial start of all threads
+    for name, info in monitored_threads.items():
+        print(f"MAIN: Starting initial thread for {name}...")
+        info["thread"] = threading.Thread(target=info["target"], daemon=True)
+        info["thread"].start()
     
-    # --- FIX: Run the web server in its own thread ---
-    # This is crucial because serve() is a blocking call.
-    http_server_thread = threading.Thread(
-        target=lambda: serve(web_app, host=config.WEB_SERVER_HOST, port=config.WEB_SERVER_PORT),
-        daemon=True
-    )
-    http_server_thread.start()
+    start_web_server()
     
-    print(f"MAIN: Web server started on http://{config.WEB_SERVER_HOST}:{config.WEB_SERVER_PORT}")
     print("--- Application is now running ---")
     print("Press Ctrl+C to shut down gracefully.")
     
     try:
-        # The main thread will now block here, waiting for a shutdown signal.
         while state.get_app_running():
-            if not all(t.is_alive() for t in threads.values()):
-                print("MAIN: A critical controller thread has died. Shutting down.")
-                break
-            if not http_server_thread.is_alive():
-                print("MAIN: The web server thread has died. Shutting down.")
-                break
-            time.sleep(1)
+            # --- Watchdog Loop ---
+            for name, info in monitored_threads.items():
+                if not info["thread"] or not info["thread"].is_alive():
+                    print(f"MAIN: WATCHDOG - Detected dead thread for '{name}'. Restarting...")
+                    info["thread"] = threading.Thread(target=info["target"], daemon=True)
+                    info["thread"].start()
+            
+            if not http_server_thread or not http_server_thread.is_alive():
+                print("MAIN: WATCHDOG - Detected dead web server thread. Restarting...")
+                start_web_server()
+
+            time.sleep(5) # Check thread health every 5 seconds
+            
     except KeyboardInterrupt:
         print("\nMAIN: Shutdown signal received. Cleaning up...")
     finally:
-        # This block now runs on Ctrl+C OR if a thread dies
         state.set_app_running(False)
         
         print("MAIN: Signaling controllers to shut down...")
@@ -81,13 +94,11 @@ def run_full_mode():
             recorder.shutdown()
         
         print("MAIN: Waiting for all threads to join...")
-        for name, thread in threads.items():
-            thread.join(timeout=15.0)
-            if thread.is_alive():
-                print(f"MAIN: WARNING - {name} thread did not exit cleanly.")
-        
-        # The http_server_thread is a daemon, so it will exit automatically
-        # when the main program exits. No need to join it.
+        for name, info in monitored_threads.items():
+            if info["thread"] and info["thread"].is_alive():
+                info["thread"].join(timeout=10.0)
+                if info["thread"].is_alive():
+                    print(f"MAIN: WARNING - {name} thread did not exit cleanly.")
         
         print("--- V1 Dashcam Application Shut Down ---")
 
