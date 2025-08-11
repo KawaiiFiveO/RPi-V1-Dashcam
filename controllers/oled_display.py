@@ -27,7 +27,10 @@ class OledDisplay:
         self.device = None
         self.font_small = None
         self.font_large = None
-        self.local_ip = self._get_local_ip()
+        
+        self.local_ip = "Checking..."
+        self.last_ip_check_time = 0
+        self.ip_check_interval = 10 # Check for a new IP every 10 seconds
 
         try:
             # Initialize the I2C interface for the OLED
@@ -55,11 +58,12 @@ class OledDisplay:
         """Gets the local IP address of the device."""
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            # doesn't even have to be reachable
+            # This address doesn't have to be reachable
             s.connect(('10.255.255.255', 1))
             IP = s.getsockname()[0]
         except Exception:
-            IP = '127.0.0.1'
+            # If no route is found, it's likely in hotspot mode or connecting
+            IP = '192.168.4.1' # Default to the known hotspot IP
         finally:
             s.close()
         return IP
@@ -138,6 +142,11 @@ class OledDisplay:
 
         while self.state.get_app_running():
             try:
+                current_time = time.time()
+                if current_time - self.last_ip_check_time > self.ip_check_interval:
+                    self.local_ip = self._get_local_ip()
+                    self.last_ip_check_time = current_time
+
                 v1_data = self.state.get_v1_data()
                 
                 with canvas(self.device) as draw:
