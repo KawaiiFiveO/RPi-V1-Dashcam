@@ -89,7 +89,7 @@ class OledDisplay:
         # Line 2: Frequency
         if v1_data.priority_alert_freq > 0:
             freq_text = f"{v1_data.priority_alert_freq:.3f} GHz"
-            draw.text((10, 14), freq_text, font=self.font_small, fill="white")
+            draw.text((10, 14), freq_text, font=self.font_large, fill="white")
 
     def _draw_normal_screen(self, draw):
         """Renders the default display screen."""
