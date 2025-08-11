@@ -48,12 +48,14 @@ def run_full_mode():
 
     def start_web_server():
         nonlocal http_server_thread
+        state.set_web_server_status("Restarting")
         print("MAIN: (Re)starting web server thread...")
         http_server_thread = threading.Thread(
             target=lambda: serve(web_app, host=config.WEB_SERVER_HOST, port=config.WEB_SERVER_PORT),
             daemon=True
         )
         http_server_thread.start()
+        state.set_web_server_status("Running")
         print(f"MAIN: Web server started on http://{config.WEB_SERVER_HOST}:{config.WEB_SERVER_PORT}")
 
     # Initial start of all threads
@@ -85,8 +87,8 @@ def run_full_mode():
     except KeyboardInterrupt:
         print("\nMAIN: Shutdown signal received. Cleaning up...")
     finally:
+        state.set_web_server_status("Shutdown")
         state.set_app_running(False)
-        
         print("MAIN: Signaling controllers to shut down...")
         if v1_controller:
             v1_controller.shutdown()

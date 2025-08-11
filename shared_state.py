@@ -34,13 +34,14 @@ class AppState:
         
         self.v1_data = V1Data()
         self.gps_data = GpsData()
-
-        self.v1_reconnect_request = False
+        
         self.app_running = True
         self.is_recording = False
         self.overlay_show_gps = True
         self.overlay_show_v1 = True
-        self._processing_files: List[Dict[str, str]] = [] 
+        self._processing_files: List[Dict[str, str]] = []
+        self.v1_reconnect_request = False
+        self.web_server_status = "Starting" # Can be: Starting, Running, Restarting
 
     # --- Getters (unchanged) ---
     def get_v1_data(self) -> V1Data:
@@ -62,6 +63,14 @@ class AppState:
         with self._lock:
             # Return a copy to prevent external modification
             return list(self._processing_files)
+    def get_and_clear_v1_reconnect_request(self) -> bool:
+        with self._lock:
+            request = self.v1_reconnect_request
+            self.v1_reconnect_request = False
+            return request
+    def get_web_server_status(self) -> str:
+        with self._lock:
+            return self.web_server_status
     # --- Setters (updated) ---
     def set_is_recording(self, status: bool):
         with self._lock:
@@ -76,7 +85,12 @@ class AppState:
     def set_gps_data(self, new_data: GpsData):
         with self._lock:
             self.gps_data = new_data
-
+    def set_v1_reconnect_request(self):
+        with self._lock:
+            self.v1_reconnect_request = True
+    def set_web_server_status(self, status: str):
+        with self._lock:
+            self.web_server_status = status
     # --- ATOMIC UPDATE METHODS FOR V1 ---
     def set_v1_connection_status(self, is_connected: bool, status: str):
         """Atomically updates the V1 connection status."""
@@ -135,12 +149,3 @@ class AppState:
             if len(self._processing_files) < initial_len:
                 print(f"APPSTATE: Removed {filename} from processing queue.")
                 
-    def get_and_clear_v1_reconnect_request(self) -> bool:
-        with self._lock:
-            request = self.v1_reconnect_request
-            self.v1_reconnect_request = False
-            return request
-
-    def set_v1_reconnect_request(self):
-        with self._lock:
-            self.v1_reconnect_request = True
