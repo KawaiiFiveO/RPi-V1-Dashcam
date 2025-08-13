@@ -13,8 +13,8 @@ Valentine One Integrated Dashcam using Raspberry Pi.
 
 ### Parts used
 
-- Raspberry Pi Model 4B
-- Any high-endurance SD card
+- Raspberry Pi 4 Model B
+- Any high-endurance Micro-SD card
 - [USB Microphone for Laptop and Desktop Computer](https://www.amazon.com/dp/B0CNVZ27YH)
 - [Arducam for Raspberry Pi Camera 16MP IMX519 Camera Module with 140°(D) Wide Angle M12 Lens](https://www.amazon.com/dp/B0C53BBMLG)
 - [DIYmall PiOLED 0.91inch I2C 128X32 SSD1306 OLED Display Module](https://www.amazon.com/dp/B07V4FRSKK)

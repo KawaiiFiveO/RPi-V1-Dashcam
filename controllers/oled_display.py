@@ -110,7 +110,7 @@ class OledDisplay:
 
         # Line 3: GPS Coordinates
         if gps_data.has_fix:
-            lat_lon_text = f"{gps_data.latitude:.4f}, {gps_data.longitude:.4f}"
+            lat_lon_text = f"{gps_data.latitude:.5f}, {gps_data.longitude:.5f}"
             draw.text((0, 16), lat_lon_text, font=self.font_small, fill="white")
         else:
             # Show a placeholder if no fix
