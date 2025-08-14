@@ -41,7 +41,7 @@ class OledDisplay:
             
             # Load fonts
             self.font_small = self._get_font('pixelmix.ttf', 8)
-            self.font_large = self._get_font('pixelmix.ttf', 24) # For prominent info
+            self.font_large = self._get_font('pixelmix.ttf', 20) # For prominent info
 
             print("OLEDDISPLAY: Initialized successfully.")
             # Briefly show a startup message
@@ -81,9 +81,14 @@ class OledDisplay:
     def _draw_alert_screen(self, draw):
         """Renders the display when a V1 alert is active."""
         v1_data = self.state.get_v1_data()
-        
-        band_text = f"{v1_data.priority_alert_band} {v1_data.priority_alert_freq:.3f}"
-        draw.text((0, 0), band_text, font=self.font_large, fill="white")
+
+        if v1_data.priority_alert_freq > 0:
+            freq_text = f"{v1_data.priority_alert_band} {v1_data.priority_alert_freq:.3f}"
+            draw.text((0, 0), freq_text, font=self.font_large, fill="white")
+        else:
+            freq_text = f"{v1_data.priority_alert_band}"
+            draw.text((0, 0), freq_text, font=self.font_large, fill="white")
+            
 
     def _draw_normal_screen(self, draw):
         """Renders the default display screen."""
