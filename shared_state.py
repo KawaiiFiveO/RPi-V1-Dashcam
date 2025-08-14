@@ -15,6 +15,8 @@ class V1Data:
     priority_alert_band: str = "N/A"
     priority_alert_direction: str = "N/A"
     priority_alert_strength: int = 0
+    priority_alert_front_strength: int = 0
+    priority_alert_rear_strength: int = 0
     v1_mode: str = "Standby"
 
 @dataclass
@@ -104,14 +106,18 @@ class AppState:
                 self.v1_data.priority_alert_freq = 0.0
                 self.v1_data.priority_alert_direction = "N/A"
                 self.v1_data.priority_alert_strength = 0
+                self.v1_data.priority_alert_front_strength = 0
+                self.v1_data.priority_alert_rear_strength = 0
 
-    def update_v1_alert_data(self, in_alert: bool, band: str, freq: float):
+    def update_v1_alert_data(self, in_alert: bool, band: str, freq: float, front_str: int, rear_str: int):
+        """Atomically updates the core V1 alert information from the alert table."""
         with self._lock:
             self.v1_data.in_alert = in_alert
             self.v1_data.priority_alert_band = band
             self.v1_data.priority_alert_freq = freq
+            self.v1_data.priority_alert_front_strength = front_str
+            self.v1_data.priority_alert_rear_strength = rear_str
             if not in_alert:
-                # If alert is cleared, also clear direction/strength
                 self.v1_data.priority_alert_direction = "N/A"
                 self.v1_data.priority_alert_strength = 0
 
@@ -120,21 +126,34 @@ class AppState:
             if not self.v1_data.in_alert:
                 self.v1_data.v1_mode = mode
 
-    # --- NEW ATOMIC UPDATE METHOD ---
-    def update_v1_display_info(self, direction: str, strength: int):
-        """Atomically updates the V1 direction and strength from display data."""
+    def update_v1_display_info(self, strength: int):
+        """Atomically updates the V1 total strength (LEDs) from display data."""
         with self._lock:
-            self.v1_data.priority_alert_direction = direction
             self.v1_data.priority_alert_strength = strength
+            # --- NEW: Derive and set the direction here ---
+            dirs = []
+            # A signal is considered "front" if front is stronger than rear.
+            if self.v1_data.priority_alert_front_strength > self.v1_data.priority_alert_rear_strength:
+                dirs.append("F")
+            # A signal is considered "rear" if rear is stronger than front.
+            elif self.v1_data.priority_alert_rear_strength > self.v1_data.priority_alert_front_strength:
+                dirs.append("R")
+            # If they are equal (and not zero), it's a side alert.
+            elif self.v1_data.priority_alert_front_strength > 0:
+                dirs.append("S")
+            
+            self.v1_data.priority_alert_direction = "/".join(dirs) if dirs else "N/A"
 
     def set_v1_laser_alert(self, direction: str, strength: int):
-        """Atomically sets a complete laser alert with correct direction and strength."""
+        """Atomically sets a complete laser alert. Laser direction is from display data."""
         with self._lock:
             self.v1_data.in_alert = True
             self.v1_data.priority_alert_band = "Laser"
             self.v1_data.priority_alert_freq = 0.0
-            self.v1_data.priority_alert_direction = direction
+            self.v1_data.priority_alert_direction = direction # Laser direction is reliable
             self.v1_data.priority_alert_strength = strength
+            self.v1_data.priority_alert_front_strength = 0 # Not applicable for laser
+            self.v1_data.priority_alert_rear_strength = 0
             
     def add_processing_file(self, filename: str, process_type: str):
         with self._lock:

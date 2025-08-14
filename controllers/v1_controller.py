@@ -361,57 +361,58 @@ class V1Controller:
             return "Laser"
         return "Unknown"
 
-    # --- NEW HELPER METHOD ---
-    def _get_direction_str(self, display_data: InfDisplayData) -> str:
-        """Constructs a direction string (e.g., F, R, F/S) from display data."""
-        dirs = []
-        if display_data.is_front(): dirs.append("F")
-        if display_data.is_side(): dirs.append("S")
-        if display_data.is_rear(): dirs.append("R")
-        return "/".join(dirs) if dirs else "N/A"
-
     async def _handle_alerts(self, alerts: List[AlertData]):
-        """Callback to process alert data (freq, band) and update the shared state."""
+        """Callback to process alert data (freq, band, strengths) and update the shared state."""
         priority_alert = next((a for a in alerts if a.is_priority), None)
 
         if priority_alert:
             freq_ghz = priority_alert.frequency / 1000.0
             band = self._get_band_from_freq(priority_alert.frequency)
-            self.state.update_v1_alert_data(in_alert=True, band=band, freq=freq_ghz)
+            # --- PASS THE STRENGTHS TO THE STATE ---
+            self.state.update_v1_alert_data(
+                in_alert=True, 
+                band=band, 
+                freq=freq_ghz,
+                front_str=priority_alert.front_strength,
+                rear_str=priority_alert.rear_strength
+            )
         else:
-            self.state.update_v1_alert_data(in_alert=False, band="N/A", freq=0.0)
+            # Clear the alert data
+            self.state.update_v1_alert_data(
+                in_alert=False, band="N/A", freq=0.0, front_str=0, rear_str=0
+            )
 
-    # --- REWRITTEN _handle_display_data METHOD ---
     async def _handle_display_data(self, display_data: InfDisplayData):
         """
-        Callback to process display data. It is the SOLE source of direction/strength
-        and the primary source for laser alert detection.
+        Callback to process display data. It is now ONLY used for total strength,
+        mode, and laser alerts.
         """
         self.state.update_v1_mode(display_data.get_mode())
 
-        # Determine if any alert is visually active in this packet
         is_alert_active_in_packet = (display_data.is_laser() or 
                                      display_data.is_ka() or 
                                      display_data.is_k() or 
                                      display_data.is_x())
 
         if is_alert_active_in_packet:
-            # Always get the current direction and strength from the packet
-            direction = self._get_direction_str(display_data)
             strength = display_data.get_num_leds()
             
             if display_data.is_laser():
-                # For laser, this packet is the only source of truth. Set the full alert.
+                # For laser, the display arrows are the only source of direction.
+                dirs = []
+                if display_data.is_front(): dirs.append("F")
+                if display_data.is_side(): dirs.append("S")
+                if display_data.is_rear(): dirs.append("R")
+                direction = "/".join(dirs) if dirs else "N/A"
                 self.state.set_v1_laser_alert(direction=direction, strength=strength)
             else:
-                # For radar, band/freq are set by _handle_alerts. We only update display info.
-                self.state.update_v1_display_info(direction=direction, strength=strength)
+                # For radar, we only update the total strength (LEDs).
+                # The direction is now derived inside AppState from front/rear strengths.
+                self.state.update_v1_display_info(strength=strength)
         else:
-            # If this packet shows no alert, but the state still thinks there is one,
-            # it means the alert just ended. Clear the display info.
-            # The full alert state will be cleared by _handle_alerts when the alert table is empty.
+            # If this packet shows no alert, clear the total strength.
             if self.state.get_v1_data().in_alert:
-                self.state.update_v1_display_info(direction="N/A", strength=0)
+                self.state.update_v1_display_info(strength=0)
 
     async def _perform_startup_checks(self):
         """Requests version and sweep info from the V1 as a self-test."""
