@@ -95,9 +95,24 @@ def burn_in_data(video_path: str, log_path: str, app_state: AppState):
             end_offset = time_offset + config.LOGGING_INTERVAL_SECONDS
             
             # --- CONSTRUCT NEW ALERT TEXT ---
+            # --- NEW: Generate direction arrows from the direction string ---
+            direction_text = str(row['v1_direction']) # Ensure it's a string
+            arrow_parts = []
+            if 'F' in direction_text:
+                arrow_parts.append('▲') # Up arrow for Front
+            if 'S' in direction_text:
+                arrow_parts.append('◆') # Diamond for Side
+            if 'R' in direction_text:
+                arrow_parts.append('▼') # Down arrow for Rear
+            
+            # Join the arrows, then add the original text
+            arrow_str = "".join(arrow_parts)
+            full_direction_display = f"{arrow_str} {direction_text}" if arrow_str else direction_text
+
+            # --- CONSTRUCT ALERT TEXT with the new direction display ---
             alert_text = (
                 f"V1 ALERT: {row['v1_band']} / {row['v1_freq_ghz']:.3f} GHz | "
-                f"Dir: {row['v1_direction']} | Str: {int(row['v1_strength'])}"
+                f"Dir: {full_direction_display} | Str: {int(row['v1_strength'])}"
             )
             escaped_alert_text = _escape_ffmpeg_text(alert_text)
 
