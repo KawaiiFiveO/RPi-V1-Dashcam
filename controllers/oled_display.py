@@ -83,7 +83,7 @@ class OledDisplay:
         v1_data = self.state.get_v1_data()
         
         # Line 1: Big, bold alert band
-        band_text = f"ALERT: {v1_data.priority_alert_band}"
+        band_text = f"Alert: {v1_data.priority_alert_band}"
         draw.text((0, 0), band_text, font=self.font_large, fill="white")
 
         # Line 2: Frequency
