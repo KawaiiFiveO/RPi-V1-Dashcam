@@ -41,7 +41,7 @@ class OledDisplay:
             
             # Load fonts
             self.font_small = self._get_font('pixelmix.ttf', 8)
-            self.font_large = self._get_font('pixelmix.ttf', 12) # For prominent info
+            self.font_large = self._get_font('pixelmix.ttf', 16) # For prominent info
 
             print("OLEDDISPLAY: Initialized successfully.")
             # Briefly show a startup message
@@ -89,7 +89,7 @@ class OledDisplay:
         # Line 2: Frequency
         if v1_data.priority_alert_freq > 0:
             freq_text = f"{v1_data.priority_alert_freq:.3f} GHz"
-            draw.text((10, 14), freq_text, font=self.font_large, fill="white")
+            draw.text((10, 16), freq_text, font=self.font_large, fill="white")
 
     def _draw_normal_screen(self, draw):
         """Renders the default display screen."""
