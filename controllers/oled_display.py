@@ -83,11 +83,11 @@ class OledDisplay:
         v1_data = self.state.get_v1_data()
 
         if v1_data.priority_alert_freq > 0:
-            freq_text = f"{v1_data.priority_alert_band} {v1_data.priority_alert_freq:.3f}"
-            draw.text((0, 0), freq_text, font=self.font_large, fill="white")
+            freq_text = f"{v1_data.priority_alert_band} {v1_data.priority_alert_freq:.3f}"
+            draw.text((0, 4), freq_text, font=self.font_large, fill="white")
         else:
             freq_text = f"{v1_data.priority_alert_band}"
-            draw.text((0, 0), freq_text, font=self.font_large, fill="white")
+            draw.text((0, 4), freq_text, font=self.font_large, fill="white")
             
 
     def _draw_normal_screen(self, draw):
