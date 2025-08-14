@@ -117,7 +117,7 @@
 
             if (isChecked && videoFeedUrl) {
                 // Show preview: set src, show container, hide placeholder
-                videoImg.src = "{{ url_for('video_feed') }}";
+                videoImg.src = videoFeedUrl;
                 previewContainer.style.display = 'block';
                 placeholder.style.display = 'none';
                 localStorage.setItem('showPreview', 'true');
