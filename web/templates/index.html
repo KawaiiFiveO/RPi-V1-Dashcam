@@ -104,6 +104,10 @@
     <script>
         const messageBox = document.getElementById('message-box');
         const isFullMode = {{ is_full_mode|tojson }};
+        // --- FIX: Conditionally define the video feed URL as a JavaScript variable ---
+        // In full mode, this will be a URL string. In web-only mode, it will be 'null'.
+        // The |tojson filter is crucial for correct syntax.
+        const videoFeedUrl = {{ url_for('video_feed')|tojson if is_full_mode else 'null'|tojson }};
         
         function togglePreview() {
             const isChecked = document.getElementById('preview-toggle').checked;
@@ -111,7 +115,7 @@
             const previewContainer = document.getElementById('preview-container');
             const placeholder = document.getElementById('preview-placeholder');
 
-            if (isChecked) {
+            if (isChecked && videoFeedUrl) {
                 // Show preview: set src, show container, hide placeholder
                 videoImg.src = "{{ url_for('video_feed') }}";
                 previewContainer.style.display = 'block';
