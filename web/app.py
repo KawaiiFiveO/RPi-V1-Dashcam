@@ -176,14 +176,35 @@ def create_app(state: Optional[AppState], picam2: Optional[Picamera2], recorder_
         data = request.get_json()
         if not data or 'filename' not in data:
             return jsonify({'message': 'Invalid request. Filename missing.'}), 400
+        
         filename = data['filename']
         video_path = os.path.join(config.VIDEO_DIR, filename)
         log_path = os.path.join(config.LOG_DIR, filename.replace('.mp4', '.csv'))
+        
         if not os.path.exists(video_path) or not os.path.exists(log_path):
             return jsonify({'message': 'Video or log file not found.'}), 404
-        thread = threading.Thread(target=burn_in_data, args=(video_path, log_path, state))
+
+        # --- FIX: Create a wrapper function to manage state ---
+        def burn_in_task_wrapper(video_path, log_path):
+            output_filename = os.path.basename(video_path).replace('.mp4', '_processed.mp4')
+            
+            # Only manage state if in full mode
+            if is_full_mode:
+                state.add_processing_file(output_filename, 'burn_in')
+            
+            try:
+                # Call the now-decoupled utility function
+                burn_in_data(video_path, log_path)
+            finally:
+                # Only manage state if in full mode
+                if is_full_mode:
+                    state.remove_processing_file(output_filename)
+
+        # Start the wrapper function in a thread
+        thread = threading.Thread(target=burn_in_task_wrapper, args=(video_path, log_path))
         thread.daemon = True
         thread.start()
+        
         return jsonify({'message': f'Burn-in process started for {filename}. A new file ending in "_processed.mp4" will be created.'}), 202
         
     @app.route('/actions/reconnect_v1', methods=['POST'])
