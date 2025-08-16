@@ -1,10 +1,10 @@
 # RPi-V1-Dashcam
 
-Valentine One Integrated Dashcam using Raspberry Pi.
+Valentine One-integrated dashcam using Raspberry Pi.
 
 ### Features
 
-- Record video and audio continuously
+- Record video and audio continuously in segments
 - Log data from a GPS module and V1
 - Display V1 alert frequencies to OLED screen
 - Burn-in logged data to video
@@ -33,6 +33,7 @@ cd RPi-V1-Dashcam
 python -m venv env --system-site-packages
 source env/bin/activate
 pip install -r requirements.txt
+cp config.example config.py
 ```
 
 You can use the scripts in `tests` to confirm that your hardware works.
@@ -43,7 +44,7 @@ Then, once you're ready to try the dashcam:
 python main.py
 ```
 
-You can configure settings such as recording duration and camera orientation in `config.py`.
+You can configure settings such as recording duration and camera orientation in `config.py`. Note that you must copy `config.example` to `config.py` to prevent your settings from being overwritten by `git pull`.
 
 If you want it to run automatically on boot, setup the service:
 
@@ -88,11 +89,9 @@ Replace `V1-Dashcam-Hotspot`, `MyHomeWifi`, and `MyPasswordHere` with your own v
 
 ### TODO
 
-- fix camera orientation
-- delete oldest videos if storage low
 - better documentation/writeup
+- delete oldest videos if storage low
 - OLED customization
-- improve web interface
 - improve overlay visuals
 - make audio optional
 - TEST EVERYTHING
