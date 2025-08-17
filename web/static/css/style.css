@@ -68,17 +68,18 @@ h1 {
     position: relative;
     background: #000;
     border-radius: var(--border-radius);
-    line-height: 0;
     overflow: hidden;
 }
 .preview-container img {
     max-width: 100%;
+    display: block;
 }
+
 .preview-overlay-item {
     position: absolute;
     padding: 5px 8px;
     color: white;
-    font-family: "Roboto", sans-serif;
+    font-family: Roboto, sans-serif;
     font-size: 14px;
     text-shadow:
        -1px -1px 0 #000,  
@@ -108,7 +109,6 @@ h1 {
     bottom: 10px;
     left: 10px;
     color: #ffc107; /* A nice, readable yellow */
-    font-weight: bold;
 }
 
 /* --- Status Grid --- */
