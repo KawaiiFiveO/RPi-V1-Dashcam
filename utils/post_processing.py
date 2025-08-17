@@ -76,7 +76,7 @@ def burn_in_data(video_path: str, log_path: str):
         for _, row in gps_entries.iterrows():
             time_offset = (row['timestamp'] - start_time).total_seconds()
             end_offset = time_offset + config.LOGGING_INTERVAL_SECONDS
-            gps_text = f"GPS: {row['latitude']:.5f}, {row['longitude']:.5f} | Sats: {int(row['sats'])} | Speed: {row['speed_mph']:.0f} MPH"
+            gps_text = f"GPS: {row['latitude']:.5f}, {row['longitude']:.5f} | Sats: {int(row['sats'])} | {row['speed_mph']:.0f} MPH"
             escaped_gps_text = _escape_ffmpeg_text(gps_text)
             
             filters.append(
