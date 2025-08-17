@@ -15,6 +15,7 @@
     --danger-color: #E04B5A; /* A strong, modern red for warnings */
     --danger-hover: #F55F6E;
     --success-color: #28A745; /* A classic, clear green */
+    --encounter-color: #00BFFF; /* Deep Sky Blue */
 
     --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --border-radius: 8px;
@@ -241,7 +242,7 @@ button:disabled:hover {
   gap: 10px;
 }
 .file-list li.encounter {
-  border-left: 4px solid var(--danger-color);
+  border-left: 4px solid var(--encounter-color);
 }
 .encounter-text {
   color: var(--danger-color);
