@@ -245,7 +245,7 @@ button:disabled:hover {
   border-left: 4px solid var(--encounter-color);
 }
 .encounter-text {
-  color: var(--danger-color);
+  color: var(--encounter-color);
   font-weight: bold;
   font-size: 0.9em;
 }
