@@ -41,7 +41,7 @@ class OledDisplay:
             
             # Load fonts
             self.font_small = self._get_font('pixelmix.ttf', 8)
-            self.font_large = self._get_font('pixelmix.ttf', 20) # For prominent info
+            self.font_large = self._get_font('pixelmix.ttf', 24) # For prominent info
 
             print("OLEDDISPLAY: Initialized successfully.")
             # Briefly show a startup message
@@ -82,12 +82,33 @@ class OledDisplay:
         """Renders the display when a V1 alert is active."""
         v1_data = self.state.get_v1_data()
 
+        # 1. Handle the main alert text (Frequency or Band)
         if v1_data.priority_alert_freq > 0:
-            freq_text = f"{v1_data.priority_alert_band} {v1_data.priority_alert_freq:.3f}"
-            draw.text((0, 6), freq_text, font=self.font_large, fill="white")
+            # Display frequency in large font for radar alerts
+            main_text = f"{v1_data.priority_alert_freq:.3f}"
+            band_text = v1_data.priority_alert_band
         else:
-            freq_text = f"{v1_data.priority_alert_band}"
-            draw.text((0, 6), freq_text, font=self.font_large, fill="white")
+            # Display "Laser" in large font for laser alerts
+            main_text = v1_data.priority_alert_band
+            band_text = None # No smaller text needed for Laser
+
+        # 2. Draw the large main text first, centered vertically
+        # The y-coordinate is calculated to center the 24px font in the 32px high display
+        draw.text((0, 4), main_text, font=self.font_large, fill="white")
+
+        # 3. If there is smaller band text to draw (i.e., for radar)
+        if band_text:
+            # 3a. Calculate the width of the large text we just drew
+            main_text_width = draw.textlength(main_text, font=self.font_large)
+            
+            # 3b. Define the position for the small text
+            # x: to the right of the large text, with a 4px gap
+            # y: aligned to the top of the large text
+            band_text_x = main_text_width + 4
+            band_text_y = 4 
+
+            # 3c. Draw the small band text
+            draw.text((band_text_x, band_text_y), band_text, font=self.font_small, fill="white")
             
 
     def _draw_normal_screen(self, draw):
