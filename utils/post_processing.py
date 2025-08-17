@@ -57,7 +57,7 @@ def burn_in_data(video_path: str, log_path: str):
             time_offset = (row['timestamp'] - start_time).total_seconds()
             end_offset = time_offset + config.LOGGING_INTERVAL_SECONDS
             # No colons, just to keep ffmpeg parser happy
-            ts_text = row['timestamp'].strftime("%Y-%m-%d %H-%M-%S")
+            ts_text = row['timestamp'].strftime("%Y-%m-%d %H.%M.%S")
             escaped_ts = _escape_ffmpeg_text(ts_text)
         
             filters.append(
