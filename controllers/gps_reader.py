@@ -23,7 +23,7 @@ class GpsReader:
         self.serial_port = config.GPS_SERIAL_PORT
         self.baud_rate = config.GPS_BAUD_RATE
 
-    def _update_state_no_fix(self, status="Scanning"):
+    def _update_state_no_fix(self, status="Searching"):
         """Helper method to reset the GPS state when no fix is available."""
         current_gps_data = self.state.get_gps_data()
         # Only update if the state changes to avoid spamming logs
@@ -42,9 +42,9 @@ class GpsReader:
                 # The 'with' statement ensures the serial port is closed on exit
                 with serial.Serial(self.serial_port, self.baud_rate, timeout=1) as ser:
                     print("GPSREADER: Serial port opened successfully.")
-                    self._update_state_no_fix(status="Scanning") # Port open, now scanning for sats
+                    self._update_state_no_fix(status="Searching") # Port open, now scanning for sats
                     
-                    current_gps_data = GpsData(status="Scanning")
+                    current_gps_data = GpsData(status="Searching")
 
                     while self.state.get_app_running():
                         try:
@@ -55,7 +55,7 @@ class GpsReader:
                                 has_fix = msg.gps_qual > 0
                                 
                                 current_gps_data.has_fix = has_fix
-                                current_gps_data.status = "Fix" if has_fix else "Scanning"
+                                current_gps_data.status = "Fix" if has_fix else "Searching"
                                 current_gps_data.latitude = msg.latitude or 0.0
                                 current_gps_data.longitude = msg.longitude or 0.0
                                 current_gps_data.altitude = msg.altitude or 0.0

@@ -41,6 +41,7 @@ class OledDisplay:
             
             # Load fonts
             self.font_small = self._get_font('pixelmix.ttf', 8)
+            self.font_medium = self._get_font('pixelmix.ttf', 16)
             self.font_large = self._get_font('pixelmix.ttf', 24) # For prominent info
 
             print("OLEDDISPLAY: Initialized successfully.")
@@ -102,13 +103,13 @@ class OledDisplay:
             main_text_width = draw.textlength(main_text, font=self.font_large)
             
             # 3b. Define the position for the small text
-            # x: to the right of the large text, with a 4px gap
+            # x: to the right of the large text, with a 2px gap
             # y: aligned to the top of the large text
-            band_text_x = main_text_width + 4
-            band_text_y = 4 
+            band_text_x = main_text_width + 2
+            band_text_y = 12
 
             # 3c. Draw the small band text
-            draw.text((band_text_x, band_text_y), band_text, font=self.font_small, fill="white")
+            draw.text((band_text_x, band_text_y), band_text, font=self.font_medium, fill="white")
             
 
     def _draw_normal_screen(self, draw):
