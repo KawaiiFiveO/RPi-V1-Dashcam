@@ -1,26 +1,24 @@
 /* RPi-V1-Dashcam/web/static/css/style.css */
 
 :root {
-  /* --- NEW: Blue/Purple Theme Variables --- */
-  --bg-color: #1a1b26; /* A deep, dark blue */
-  --surface-color: #24283b; /* A slightly lighter blue for cards/sections */
-  --surface-hover: #3b4261;
-  --border-color: #414868;
-  --text-primary: #c0caf5; /* A soft, light blue for text */
-  --text-secondary: #a9b1d6;
+    --bg-color: #0F102A; /* Very dark, deep indigo background */
+    --surface-color: #1C1E3B; /* A slightly lighter, saturated blue for cards */
+    --surface-hover: #2A2C4F;
+    --border-color: #33365A;
+    --text-primary: #E1E1E6; /* A cool, high-contrast off-white for text */
+    --text-secondary: #8D8D99; /* A dimmer gray for less important text */
 
-  --primary-color: #7aa2f7; /* A bright, clear blue accent */
-  --primary-hover: #9eceff;
-  --primary-glow: 0 0 15px rgba(122, 162, 247, 0.4); /* Glow effect for the primary color */
+    --primary-color: #8257E5; /* A vibrant, electric purple accent */
+    --primary-hover: #9466FF;
+    --primary-glow: 0 0 15px rgba(130, 87, 229, 0.4); /* Glow effect for the purple */
 
-  --danger-color: #f7768e; /* A modern, slightly softer red */
-  --danger-hover: #ff9e64;
-  --success-color: #9ece6a; /* A modern green */
+    --danger-color: #E04B5A; /* A strong, modern red for warnings */
+    --danger-hover: #F55F6E;
+    --success-color: #28A745; /* A classic, clear green */
 
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --border-radius: 8px;
-  --shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --border-radius: 8px;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
 }
 
 body {
