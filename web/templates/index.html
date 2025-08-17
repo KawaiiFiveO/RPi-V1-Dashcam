@@ -282,13 +282,12 @@
                         let analysisText = '';
                         let encounterClass = '';
                         
-                        // --- MODIFIED: Generate analysis text with band types ---
+                        // --- MODIFIED: Generate analysis text with both bands and point count ---
                         if (file.analysis && file.analysis.has_alerts) {
-                            // Join the bands array into a comma-separated string
                             const bandsText = file.analysis.bands.join(', ');
                             
-                            // Display the bands, and optionally the point count
-                            analysisText = ` <span class="encounter-text">(Encounter: ${bandsText})</span>`;
+                            // Construct the new, more detailed string
+                            analysisText = ` <span class="encounter-text">(Encounter: ${bandsText} | ${file.analysis.alert_points}/${file.analysis.total_points} points)</span>`;
                             encounterClass = 'encounter';
                         }
                         
