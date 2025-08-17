@@ -281,8 +281,14 @@
 
                         let analysisText = '';
                         let encounterClass = '';
+                        
+                        // --- MODIFIED: Generate analysis text with band types ---
                         if (file.analysis && file.analysis.has_alerts) {
-                            analysisText = ` <span class="encounter-text">(Encounter: ${file.analysis.alert_points}/${file.analysis.total_points})</span>`;
+                            // Join the bands array into a comma-separated string
+                            const bandsText = file.analysis.bands.join(', ');
+                            
+                            // Display the bands, and optionally the point count
+                            analysisText = ` <span class="encounter-text">(Encounter: ${bandsText})</span>`;
                             encounterClass = 'encounter';
                         }
                         
@@ -302,7 +308,7 @@
                         list.appendChild(li);
                     });
                 }
-            } catch (error) {
+            } catch (error)
                 console.error('Error fetching file list:', error);
                 document.getElementById('file-list').innerHTML = '<li>Error loading file list.</li>';
             }
