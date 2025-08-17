@@ -77,10 +77,14 @@ h1 {
 .preview-overlay-item {
     position: absolute;
     padding: 5px 8px;
-    background-color: rgba(0, 0, 0, 0.6);
     color: white;
-    font-family: monospace;
+    font-family: "Roboto", sans-serif;
     font-size: 14px;
+    text-shadow:
+       -1px -1px 0 #000,  
+        1px -1px 0 #000,
+       -1px  1px 0 #000,
+        1px  1px 0 #000;
     border-radius: 4px;
     white-space: nowrap;
     overflow: hidden;
