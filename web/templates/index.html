@@ -203,6 +203,11 @@
                     v1ConnectionText = status.v1.v1_mode;
                 }
                 
+                let gpsStatusText = status.gps.status;
+                if (status.gps.has_fix) {
+                    gpsStatusText = `${status.gps.status} (${status.gps.num_sats} sats)`;
+                }
+                
                 const v1AlertText = status.v1.in_alert ? `${status.v1.priority_alert_band} / ${status.v1.priority_alert_freq.toFixed(3)}` : 'None';
                 const v1DirText = status.v1.in_alert ? status.v1.priority_alert_direction : '–';
                 const v1StrText = status.v1.in_alert ? status.v1.priority_alert_strength : '0';
