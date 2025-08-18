@@ -106,7 +106,7 @@ class Recorder:
             try:
                 encoder = H264Encoder(bitrate=config.VIDEO_BITRATE)
                 print(f"RECORDER: Recording new clip: {temp_video_path}")
-                self.picam2.start_recording(encoder, temp_video_path)
+                self.picam2.start_encoder(encoder, output=temp_video_path, name="main")
 
                 self.is_audio_thread_running.set()
                 self.is_logging_thread_running.set()
@@ -128,13 +128,14 @@ class Recorder:
                     # Check if it's time to split to a new file
                     if time.time() - last_split_time >= config.CLIP_DURATION_SECONDS:
                         print("RECORDER: Clip duration reached. Splitting file.")
+                        self.picam2.split_recording(temp_video_path, name="main")
                         break # Exit inner loop to save the current clip
 
             finally:
                 # This block now runs on stop, on split, or on helper thread failure
                 if self.picam2.started:
-                    self.picam2.stop_recording()
-                    print("RECORDER: Camera encoding stopped for current segment.")
+                    self.picam2.stop_encoder(name="main")
+                    print("RECORDER: Camera 'main' stream encoder stopped.")
 
                 # Clean up the helper threads
                 self.is_audio_thread_running.clear()

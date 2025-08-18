@@ -119,7 +119,10 @@ class OledDisplay:
         web_status = self.state.get_web_server_status()
 
         # Line 1: V1 connection status
-        v1_status_text = f"V1: {v1_data.connection_status}"
+        if v1_data.is_connected:
+            v1_status_text = f"V1: {v1_data.v1_mode}"
+        else:
+            v1_status_text = f"V1: {v1_data.connection_status}"
         draw.text((0, 0), v1_status_text, font=self.font_small, fill="white")
 
         # Line 2: GPS status and Speed
