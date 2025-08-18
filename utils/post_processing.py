@@ -98,16 +98,17 @@ def burn_in_data(video_path: str, log_path: str):
             # --- NEW: Generate direction arrows from the direction string ---
             direction_text = str(row['v1_direction']) # Ensure it's a string
             arrow_parts = []
-            if 'F' in direction_text:
-                arrow_parts.append('▲') # Up arrow for Front
-            if 'S' in direction_text:
-                arrow_parts.append('◆') # Diamond for Side
-            if 'R' in direction_text:
-                arrow_parts.append('▼') # Down arrow for Rear
-            
-            # Join the arrows, then add the original text
-            arrow_str = "".join(arrow_parts)
-            full_direction_display = f"{arrow_str} {direction_text}" if arrow_str else direction_text
+            #if 'F' in direction_text:
+            #    arrow_parts.append('▲') # Up arrow for Front
+            #if 'S' in direction_text:
+            #    arrow_parts.append('◆') # Diamond for Side
+            #if 'R' in direction_text:
+            #    arrow_parts.append('▼') # Down arrow for Rear
+            #
+            ## Join the arrows, then add the original text
+            #arrow_str = "".join(arrow_parts)
+            #full_direction_display = f"{arrow_str} {direction_text}" if arrow_str else direction_text
+            full_direction_display = direction_text
 
             # --- CONSTRUCT ALERT TEXT with the new direction display ---
             alert_text = (
