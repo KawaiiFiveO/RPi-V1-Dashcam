@@ -4,6 +4,7 @@ import threading
 import time
 import sys
 from waitress import serve
+import signal
 
 # Import all application components
 import config
@@ -21,6 +22,16 @@ def run_full_mode():
     print("--- V1 Dashcam Application Starting (Full Mode) ---")
     
     state = AppState()
+    
+    # --- NEW: Graceful Shutdown Handler ---
+    def graceful_shutdown_handler(signum, frame):
+        """Sets the app_running flag to False on SIGINT or SIGTERM."""
+        print(f"\nMAIN: Shutdown signal received (Signal {signum}). Cleaning up...")
+        state.set_app_running(False)
+
+    # Register the handler for both SIGINT (Ctrl+C) and SIGTERM (systemctl stop)
+    signal.signal(signal.SIGINT, graceful_shutdown_handler)
+    signal.signal(signal.SIGTERM, graceful_shutdown_handler)
 
     print("MAIN: Initializing controllers...")
     try:
@@ -69,9 +80,10 @@ def run_full_mode():
     print("--- Application is now running ---")
     print("Press Ctrl+C to shut down gracefully.")
     
+    # --- MODIFIED: Removed the try/except KeyboardInterrupt block ---
+    # The new signal handler makes it redundant. The finally block is all we need.
     try:
         while state.get_app_running():
-            # --- Watchdog Loop ---
             for name, info in monitored_threads.items():
                 if not info["thread"] or not info["thread"].is_alive():
                     print(f"MAIN: WATCHDOG - Detected dead thread for '{name}'. Restarting...")
@@ -82,13 +94,12 @@ def run_full_mode():
                 print("MAIN: WATCHDOG - Detected dead web server thread. Restarting...")
                 start_web_server()
 
-            time.sleep(5) # Check thread health every 5 seconds
+            time.sleep(5)
             
-    except KeyboardInterrupt:
-        print("\nMAIN: Shutdown signal received. Cleaning up...")
     finally:
+        # This block now runs reliably for both Ctrl+C and systemctl stop
         state.set_web_server_status("Shutdown")
-        state.set_app_running(False)
+        
         print("MAIN: Signaling controllers to shut down...")
         if v1_controller:
             v1_controller.shutdown()
