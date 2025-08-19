@@ -2,6 +2,12 @@
 
 Valentine One-integrated dashcam using Raspberry Pi.
 
+### [The documentation has moved HERE.](https://onehalf.dev/Road-Avenger/)
+
+The information below is now obsolete.
+
+---
+
 ### Features
 
 - Record video and audio continuously in segments
@@ -86,12 +92,3 @@ sudo systemctl restart NetworkManager
 ```
 
 Replace `V1-Dashcam-Hotspot`, `MyHomeWifi`, and `MyPasswordHere` with your own values.
-
-### TODO
-
-- better documentation/writeup
-- delete oldest videos if storage low
-- OLED customization
-- improve overlay visuals
-- make audio optional
-- TEST EVERYTHING
