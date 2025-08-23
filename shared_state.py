@@ -1,8 +1,19 @@
 # RPi-V1-Dashcam/shared_state.py
 
 import threading
+import io
+from threading import Condition
 from dataclasses import dataclass, field
 from typing import Optional
+
+class StreamingOutput(io.BufferedIOBase):
+    def __init__(self):
+        self.frame = None
+        self.condition = Condition()
+    def write(self, buf):
+        with self.condition:
+            self.frame = buf
+            self.condition.notify_all()
 
 @dataclass
 class V1Data:
@@ -44,6 +55,7 @@ class AppState:
         self._processing_files: List[Dict[str, str]] = []
         self.v1_reconnect_request = False
         self.web_server_status = "Starting" # Can be: Starting, Running, Restarting
+        self.streaming_output = StreamingOutput() # Buffer for web preview
 
     # --- Getters (unchanged) ---
     def get_v1_data(self) -> V1Data:
@@ -73,6 +85,9 @@ class AppState:
     def get_web_server_status(self) -> str:
         with self._lock:
             return self.web_server_status
+    def get_streaming_output(self) -> StreamingOutput:
+        # No lock needed as it's set once at init
+        return self.streaming_output
     # --- Setters (updated) ---
     def set_is_recording(self, status: bool):
         with self._lock:

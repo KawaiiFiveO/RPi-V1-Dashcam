@@ -13,7 +13,7 @@ from picamera2.encoders import MJPEGEncoder
 from picamera2.outputs import FileOutput
 
 # Import shared application components
-from shared_state import AppState
+from shared_state import AppState, StreamingOutput
 import config
 
 # The post_processing utility is imported here but will only be used by a background thread
@@ -24,22 +24,6 @@ from utils.log_analyzer import analyze_log_file
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from controllers.recorder import Recorder
-
-
-class StreamingOutput(io.BufferedIOBase):
-    """
-    A thread-safe, in-memory buffer for the live video stream frames.
-    The camera records to this buffer, and the Flask app reads from it.
-    """
-    def __init__(self):
-        self.frame = None
-        self.condition = Condition()
-
-    def write(self, buf):
-        with self.condition:
-            self.frame = buf
-            self.condition.notify_all()
-
 
 def create_app(state: Optional[AppState], picam2: Optional[Picamera2], recorder_controller: Optional['Recorder']):
     """
@@ -53,12 +37,9 @@ def create_app(state: Optional[AppState], picam2: Optional[Picamera2], recorder_
     is_full_mode = all(obj is not None for obj in [state, picam2, recorder_controller])
 
     if is_full_mode:
-        streaming_output = StreamingOutput()
-        mjpeg_encoder = MJPEGEncoder()
-        picam2.start_recording(mjpeg_encoder, FileOutput(streaming_output), name="lores")
+        # --- FIX: Get the shared buffer from AppState ---
+        streaming_output = state.get_streaming_output()
         
-        print("WEB: MJPEG encoder for live preview started on 'lores' stream.")
-
         def generate_frames():
             while True:
                 with streaming_output.condition:

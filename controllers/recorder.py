@@ -41,10 +41,9 @@ class Recorder:
         self.audio_device_index = self._find_audio_device()
         self._setup_camera()
 
-        self.recording_thread: Optional[threading.Thread] = None
-        self.recording_lock = threading.Lock()
-        self.is_audio_thread_running = threading.Event()
-        self.is_logging_thread_running = threading.Event()
+        # --- Internal state for the new state machine ---
+        self._is_currently_recording = False
+        self._recording_lock = threading.Lock()
 
     def _setup_camera(self):
         print("RECORDER: Configuring camera with optimized stream formats...")
@@ -90,74 +89,110 @@ class Recorder:
             self.state.set_is_recording(False)
             return True
 
-    def _recording_loop(self):
-        print("RECORDER: Recording loop started.")
-        
-        while self.state.get_is_recording():
-            audio_thread = None
-            logging_thread = None
-            
+    # --- The web app now only calls these simple flag setters ---
+    def start_recording(self) -> bool:
+        """Signals the recorder's main loop to start recording."""
+        if self.state.get_is_recording():
+            return False # Already signaled to record
+        print("RECORDER: Received start recording signal.")
+        self.state.set_is_recording(True)
+        return True
+
+    def stop_recording(self) -> bool:
+        """Signals the recorder's main loop to stop recording."""
+        if not self.state.get_is_recording():
+            return False # Already signaled to stop
+        print("RECORDER: Received stop recording signal.")
+        self.state.set_is_recording(False)
+        return True
+
+    def _record_clip(self):
+        """
+        This function now records exactly ONE clip and then returns.
+        It is called repeatedly by the main run() loop.
+        """
+        with self._recording_lock:
+            if not self.state.get_is_recording():
+                return # Stop signal received before we could start
+
             base_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
             temp_video_path = str(config.VIDEO_DIR / f"{base_filename}.h264")
             temp_audio_path = str(config.VIDEO_DIR / f"{base_filename}.wav")
             log_path = str(config.LOG_DIR / f"{base_filename}.csv")
             final_video_path = str(config.VIDEO_DIR / f"{base_filename}.mp4")
 
+            audio_thread = None
+            logging_thread = None
+            
             try:
+                print(f"RECORDER: Starting new clip: {temp_video_path}")
                 encoder = H264Encoder(bitrate=config.VIDEO_BITRATE)
-                print(f"RECORDER: Recording new clip: {temp_video_path}")
                 self.picam2.start_encoder(encoder, output=temp_video_path, name="main")
+                self._is_currently_recording = True
 
-                self.is_audio_thread_running.set()
-                self.is_logging_thread_running.set()
-                audio_thread = threading.Thread(target=self._record_audio_clip, args=(temp_audio_path,))
-                logging_thread = threading.Thread(target=self._log_data_clip, args=(log_path,))
+                is_audio_thread_running = threading.Event()
+                is_logging_thread_running = threading.Event()
+                is_audio_thread_running.set()
+                is_logging_thread_running.set()
+
+                audio_thread = threading.Thread(target=self._record_audio_segment, args=(temp_audio_path, is_audio_thread_running))
+                logging_thread = threading.Thread(target=self._log_data_segment, args=(log_path, is_logging_thread_running))
                 audio_thread.start()
                 logging_thread.start()
-                
-                last_split_time = time.time()
 
-                while self.state.get_is_recording():
-                    time.sleep(1)
-                    
-                    # --- FIX: Health check for helper threads ---
+                start_time = time.time()
+                while time.time() - start_time < config.CLIP_DURATION_SECONDS:
+                    if not self.state.get_is_recording():
+                        print("RECORDER: Stop signal detected, ending clip early.")
+                        break
                     if not audio_thread.is_alive() or not logging_thread.is_alive():
-                        print("RECORDER: ERROR - A helper thread died unexpectedly. Saving clip and restarting.")
-                        break # Exit inner loop to save the current clip
-
-                    # Check if it's time to split to a new file
-                    if time.time() - last_split_time >= config.CLIP_DURATION_SECONDS:
-                        print("RECORDER: Clip duration reached. Splitting file.")
-                        self.picam2.split_recording(temp_video_path, name="main")
-                        break # Exit inner loop to save the current clip
+                        print("RECORDER: Helper thread died, ending clip early.")
+                        break
+                    time.sleep(1)
 
             finally:
-                # This block now runs on stop, on split, or on helper thread failure
-                if self.picam2.started:
-                    self.picam2.stop_encoder(name="main")
-                    print("RECORDER: Camera 'main' stream encoder stopped.")
+                print("RECORDER: Finalizing clip.")
+                self.picam2.stop_encoder(name="main")
+                self._is_currently_recording = False
 
-                # Clean up the helper threads
-                self.is_audio_thread_running.clear()
-                self.is_logging_thread_running.clear()
-                if audio_thread and audio_thread.is_alive():
+                if audio_thread:
+                    is_audio_thread_running.clear()
                     audio_thread.join(timeout=5.0)
-                if logging_thread and logging_thread.is_alive():
+                if logging_thread:
+                    is_logging_thread_running.clear()
                     logging_thread.join(timeout=5.0)
-                
-                # Process the finished clip in the background
+
                 if os.path.exists(temp_video_path):
-                    print(f"RECORDER: Spawning processing thread for {final_video_path}")
-                    processing_thread = threading.Thread(
-                        target=self._process_finished_clip,
-                        args=(temp_video_path, temp_audio_path, final_video_path),
-                        daemon=True
-                    )
-                    processing_thread.start()
+                    self._process_finished_clip(temp_video_path, temp_audio_path, final_video_path)
+
+    def run(self):
+        """The main state machine loop for the recorder thread."""
+        print("RECORDER: Starting camera and entering main control loop...")
+        self.picam2.start()
         
-        with self.recording_lock:
-            self.recording_thread = None
-        print("RECORDER: Recording loop finished cleanly.")
+        # This ensures the web preview stream is ALWAYS running, independently.
+        mjpeg_encoder = MJPEGEncoder()
+        streaming_output = self.state.get_streaming_output() # Get buffer from AppState
+        self.picam2.start_recording(mjpeg_encoder, FileOutput(streaming_output), name="lores")
+        print("RECORDER: MJPEG encoder for live preview started on 'lores' stream.")
+
+        while self.state.get_app_running():
+            should_be_recording = self.state.get_is_recording()
+
+            if should_be_recording and not self._is_currently_recording:
+                # State wants to record, but we are not. Start a new clip.
+                self._record_clip()
+            elif not should_be_recording and self._is_currently_recording:
+                # This case is handled by the inner loop of _record_clip,
+                # but we log it for clarity.
+                print("RECORDER: Waiting for current clip to finalize before idling.")
+            
+            time.sleep(0.5) # Main loop polling interval
+
+        print("RECORDER: Shutdown signal received, stopping camera.")
+        self.picam2.stop()
+        self.audio_interface.terminate()
+        print("RECORDER: Recorder shutdown complete.")
 
     def _process_finished_clip(self, temp_video_path, temp_audio_path, final_video_path):
         # --- Signal start of processing ---
@@ -198,7 +233,7 @@ class Recorder:
         except subprocess.CalledProcessError as e:
             print(f"RECORDER: ERROR - ffmpeg packaging failed. STDERR: {e.stderr}")
 
-    def _record_audio_clip(self, output_path: str):
+    def _record_audio_segment(self, output_path: str, running_event: threading.Event):
         if self.audio_device_index is None: return
         stream = None
         try:
@@ -220,7 +255,7 @@ class Recorder:
                 stream.close()
             print("RECORDER: Audio recording thread finished.")
 
-    def _log_data_clip(self, output_path: str):
+    def _log_data_segment(self, output_path: str, running_event: threading.Event):
         # --- ADD NEW HEADERS ---
         header = [
             'timestamp', 'latitude', 'longitude', 'altitude', 'sats', 'speed_mph', 

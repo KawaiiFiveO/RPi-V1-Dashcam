@@ -212,13 +212,19 @@ class V1BleakClient:
         print(f"V1CLIENT: Connecting to {device.name} ({device.address})...")
         self.client = BleakClient(device)
         try:
-            await self.client.connect()
+            # --- FIX: Add specific timeout and detailed error logging ---
+            await self.client.connect(timeout=20.0) # 20 second connection timeout
             await self.client.start_notify(config.V1_NOTIFY_CHAR_UUID, self._notification_handler)
             print("V1CLIENT: Successfully connected and subscribed to notifications.")
             self.v1_type = DeviceId.VALENTINE_ONE
             return True
+        except BleakError as e:
+            # This is the key for debugging. It will print the exact reason for failure.
+            print(f"V1CLIENT: BleakError during connection: {e}")
+            self.client = None
+            return False
         except Exception as e:
-            print(f"V1CLIENT: Failed to connect: {e}")
+            print(f"V1CLIENT: A generic error occurred during connection: {e}")
             self.client = None
             return False
 
@@ -463,9 +469,14 @@ class V1Controller:
                                 print("V1CONTROLLER: Manual reconnect triggered while connected.")
                                 break # Break inner loop to force disconnect and rescan
                             await asyncio.sleep(1)
+                        else:
+                            print("V1CONTROLLER: Connection attempt failed.")
+                            self.state.set_v1_connection_status(False, "Connect Failed")
+                            await asyncio.sleep(10) # Wait before retrying
 
                 except BleakError as e:
-                    print(f"V1CONTROLLER: A Bluetooth error occurred: {e}")
+                    print(f"V1CONTROLLER: A Bluetooth error occurred in the main loop: {e}")
+                    self.state.set_v1_connection_status(False, "Error")
                 finally:
                     print("V1CONTROLLER: Cleaning up connection...")
                     await self.v1_client.disconnect()
