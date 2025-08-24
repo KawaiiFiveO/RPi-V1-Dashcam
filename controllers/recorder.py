@@ -40,10 +40,11 @@ class Recorder:
         
         self.audio_device_index = self._find_audio_device()
         self._setup_camera()
-
-        # --- Internal state for the new state machine ---
-        self._is_currently_recording = False
-        self._recording_lock = threading.Lock()
+        
+        # --- Internal state for the state machine ---
+        self._is_clip_recording = False
+        self._clip_thread: Optional[threading.Thread] = None
+        self._lock = threading.Lock()
 
     def _setup_camera(self):
         print("RECORDER: Configuring camera with optimized stream formats...")
