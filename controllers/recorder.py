@@ -41,11 +41,13 @@ class Recorder:
         self.audio_device_index = self._find_audio_device()
         self._setup_camera()
         
-        # --- Internal state for the state machine ---
-        self._is_clip_recording = False
         self._clip_thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
-
+        
+        # --- FIX: Store the encoder objects themselves ---
+        self.mjpeg_encoder = MJPEGEncoder()
+        # The H264 encoder is created per-clip, so it will be a local variable.
+        
     def _setup_camera(self):
         print("RECORDER: Configuring camera with optimized stream formats...")
         hflip = (config.VIDEO_ROTATION == 180)
@@ -74,22 +76,6 @@ class Recorder:
         print("RECORDER: WARNING - No matching USB microphone found. Audio will not be recorded.")
         return None
 
-    def start_recording(self) -> bool:
-        with self.recording_lock:
-            if self.recording_thread and self.recording_thread.is_alive():
-                return False
-            self.state.set_is_recording(True)
-            self.recording_thread = threading.Thread(target=self._recording_loop, daemon=True)
-            self.recording_thread.start()
-            return True
-
-    def stop_recording(self) -> bool:
-        with self.recording_lock:
-            if not (self.recording_thread and self.recording_thread.is_alive()):
-                return False
-            self.state.set_is_recording(False)
-            return True
-
     # --- The web app now only calls these simple flag setters ---
     def start_recording(self) -> bool:
         """Signals the recorder's main loop to start recording."""
@@ -112,10 +98,7 @@ class Recorder:
         This thread target records clips back-to-back as long as the main state desires recording.
         """
         while self.state.get_is_recording():
-            with self._lock:
-                self._is_clip_recording = True
-
-            base_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_filename = datetime.now().strftime("%Ym%d_%H%M%S")
             temp_video_path = str(config.VIDEO_DIR / f"{base_filename}.h264")
             temp_audio_path = str(config.VIDEO_DIR / f"{base_filename}.wav")
             log_path = str(config.LOG_DIR / f"{base_filename}.csv")
@@ -126,11 +109,13 @@ class Recorder:
             audio_thread = threading.Thread(target=self._record_audio_segment, args=(temp_audio_path, is_audio_running))
             logging_thread = threading.Thread(target=self._log_data_segment, args=(log_path, is_logging_running))
             
+            # --- FIX: Create and store the H264 encoder object for this clip ---
+            h264_encoder = H264Encoder(bitrate=config.VIDEO_BITRATE)
+            
             try:
                 print(f"RECORDER: Starting new clip: {temp_video_path}")
-                encoder = H264Encoder(bitrate=config.VIDEO_BITRATE)
-                # --- FIX: Use start_recording, which is the correct non-blocking high-level method ---
-                self.picam2.start_recording(encoder, temp_video_path, name="main")
+                # --- FIX: Use start_encoder with the object ---
+                self.picam2.start_encoder(h264_encoder, output=temp_video_path)
                 audio_thread.start()
                 logging_thread.start()
 
@@ -146,8 +131,8 @@ class Recorder:
             
             finally:
                 print("RECORDER: Finalizing clip.")
-                # --- FIX: Use stop_recording with the correct name argument ---
-                self.picam2.stop_recording(name="main")
+                # --- FIX: Use stop_encoder with the specific encoder OBJECT ---
+                self.picam2.stop_encoder(h264_encoder)
                 
                 is_audio_running.clear()
                 is_logging_running.clear()
@@ -158,7 +143,6 @@ class Recorder:
                     self._process_finished_clip(temp_video_path, temp_audio_path, final_video_path)
         
         with self._lock:
-            self._is_clip_recording = False
             self._clip_thread = None
         print("RECORDER: Clip recording loop has finished.")
 
@@ -167,10 +151,10 @@ class Recorder:
         print("RECORDER: Starting camera and entering main control loop...")
         self.picam2.start()
         
-        mjpeg_encoder = MJPEGEncoder()
         streaming_output = self.state.get_streaming_output()
-        # --- FIX: Use start_recording for the lores stream as well ---
-        self.picam2.start_recording(mjpeg_encoder, FileOutput(streaming_output), name="lores")
+        lores_output = FileOutput(streaming_output)
+        # --- FIX: Use start_encoder with the stored MJPEG encoder object ---
+        self.picam2.start_encoder(self.mjpeg_encoder, lores_output, name="lores")
         print("RECORDER: MJPEG encoder for live preview started on 'lores' stream.")
 
         while self.state.get_app_running():
@@ -203,9 +187,10 @@ class Recorder:
         
         if self.picam2.started:
             print("RECORDER: Stopping camera system.")
+            # --- FIX: Stop the specific MJPEG encoder before stopping the camera ---
+            self.picam2.stop_encoder(self.mjpeg_encoder)
             self.picam2.stop()
         
-        # --- FIX: Terminate the audio interface LAST, after all threads are joined ---
         self.audio_interface.terminate()
         print("RECORDER: Recorder shutdown complete.")
 
@@ -287,5 +272,3 @@ class Recorder:
             print(f"RECORDER: CRITICAL ERROR during data logging: {e}")
         finally:
             print("RECORDER: Data logging thread finished.")
-
-
