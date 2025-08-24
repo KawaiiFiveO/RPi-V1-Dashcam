@@ -98,7 +98,7 @@ class Recorder:
         This thread target records clips back-to-back as long as the main state desires recording.
         """
         while self.state.get_is_recording():
-            base_filename = datetime.now().strftime("%Ym%d_%H%M%S")
+            base_filename = datetime.now().strftime("%Y%m%d_%H%M%S")
             temp_video_path = str(config.VIDEO_DIR / f"{base_filename}.h264")
             temp_audio_path = str(config.VIDEO_DIR / f"{base_filename}.wav")
             log_path = str(config.LOG_DIR / f"{base_filename}.csv")
