@@ -103,8 +103,6 @@ def run_full_mode():
         print("MAIN: Signaling controllers to shut down...")
         if v1_controller:
             v1_controller.shutdown()
-        if recorder:
-            recorder.shutdown()
         
         print("MAIN: Waiting for all threads to join...")
         for name, info in monitored_threads.items():
