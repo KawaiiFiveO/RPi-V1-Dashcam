@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Optional
 
 from picamera2 import Picamera2
-from picamera2.encoders import H264Encoder
+from picamera2.encoders import H264Encoder, MJPEGEncoder
 from picamera2.outputs import FileOutput
 from picamera2 import MappedArray
 from libcamera import controls
