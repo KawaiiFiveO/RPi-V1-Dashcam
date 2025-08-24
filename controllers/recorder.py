@@ -204,10 +204,11 @@ class Recorder:
         if self.audio_device_index is None: return
         stream = None
         try:
-            stream = self.audio_interface.open(format=config.AUDIO_FORMAT, channels=config.AUDIO_CHANNELS, rate=config.AUDIO_RATE, input=True, input_device_index=self.audio_device_index, frames_per_buffer=config.AUDIO_CHUNK_SIZE)
+            stream = self.audio_interface.open(format=config.AUDIO_FORMAT, channels=config.AUDIO_CHANNELS, rate=config.AUDIO_RATE, input=True, input_device_index=self.audio_device_index, frames_per_buffer=config.AUDIO_FRAMES_PER_BUFFER)
             frames = []
-            while self.is_audio_thread_running.is_set():
-                frames.append(stream.read(config.AUDIO_CHUNK_SIZE, exception_on_overflow=False))
+            # --- FIX: Use the passed-in running_event ---
+            while running_event.is_set():
+                frames.append(stream.read(config.AUDIO_FRAMES_PER_BUFFER, exception_on_overflow=False))
             
             with wave.open(output_path, 'wb') as wf:
                 wf.setnchannels(config.AUDIO_CHANNELS)
@@ -221,28 +222,18 @@ class Recorder:
                 stream.stop_stream()
                 stream.close()
             print("RECORDER: Audio recording thread finished.")
-
+    
     def _log_data_segment(self, output_path: str, running_event: threading.Event):
-        # --- ADD NEW HEADERS ---
-        header = [
-            'timestamp', 'latitude', 'longitude', 'altitude', 'sats', 'speed_mph', 
-            'v1_in_alert', 'v1_freq_ghz', 'v1_band', 'v1_direction', 'v1_strength'
-        ]
+        header = ['timestamp', 'latitude', 'longitude', 'altitude', 'sats', 'speed_mph', 'v1_in_alert', 'v1_freq_ghz', 'v1_band', 'v1_direction', 'v1_strength']
         try:
             with open(output_path, 'w', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow(header)
-                while self.is_logging_thread_running.is_set():
+                # --- FIX: Use the passed-in running_event ---
+                while running_event.is_set():
                     gps_data = self.state.get_gps_data()
                     v1_data = self.state.get_v1_data()
-                    # --- ADD NEW DATA TO THE ROW ---
-                    writer.writerow([
-                        datetime.now().isoformat(), 
-                        gps_data.latitude, gps_data.longitude, gps_data.altitude, 
-                        gps_data.num_sats, gps_data.speed_mph, 
-                        v1_data.in_alert, v1_data.priority_alert_freq, v1_data.priority_alert_band,
-                        v1_data.priority_alert_direction, v1_data.priority_alert_strength
-                    ])
+                    writer.writerow([datetime.now().isoformat(), gps_data.latitude, gps_data.longitude, gps_data.altitude, gps_data.num_sats, gps_data.speed_mph, v1_data.in_alert, v1_data.priority_alert_freq, v1_data.priority_alert_band, v1_data.priority_alert_direction, v1_data.priority_alert_strength])
                     time.sleep(config.LOGGING_INTERVAL_SECONDS)
         except Exception as e:
             print(f"RECORDER: CRITICAL ERROR during data logging: {e}")
