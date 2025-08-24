@@ -109,8 +109,7 @@ class Recorder:
 
     def _clip_recording_loop(self):
         """
-        This is the new thread target. It records clips back-to-back
-        as long as the main state desires recording.
+        This thread target records clips back-to-back as long as the main state desires recording.
         """
         while self.state.get_is_recording():
             with self._lock:
@@ -130,7 +129,8 @@ class Recorder:
             try:
                 print(f"RECORDER: Starting new clip: {temp_video_path}")
                 encoder = H264Encoder(bitrate=config.VIDEO_BITRATE)
-                self.picam2.start_encoder(encoder, output=temp_video_path, name="main")
+                # --- FIX: Use start_recording, which is the correct non-blocking high-level method ---
+                self.picam2.start_recording(encoder, temp_video_path, name="main")
                 audio_thread.start()
                 logging_thread.start()
 
@@ -146,7 +146,8 @@ class Recorder:
             
             finally:
                 print("RECORDER: Finalizing clip.")
-                self.picam2.stop_encoder(name="main")
+                # --- FIX: Use stop_recording with the correct name argument ---
+                self.picam2.stop_recording(name="main")
                 
                 is_audio_running.clear()
                 is_logging_running.clear()
@@ -160,6 +161,53 @@ class Recorder:
             self._is_clip_recording = False
             self._clip_thread = None
         print("RECORDER: Clip recording loop has finished.")
+
+    def run(self):
+        """The main state machine loop for the entire Recorder controller."""
+        print("RECORDER: Starting camera and entering main control loop...")
+        self.picam2.start()
+        
+        mjpeg_encoder = MJPEGEncoder()
+        streaming_output = self.state.get_streaming_output()
+        # --- FIX: Use start_recording for the lores stream as well ---
+        self.picam2.start_recording(mjpeg_encoder, FileOutput(streaming_output), name="lores")
+        print("RECORDER: MJPEG encoder for live preview started on 'lores' stream.")
+
+        while self.state.get_app_running():
+            should_be_recording = self.state.get_is_recording()
+
+            with self._lock:
+                is_thread_running = self._clip_thread and self._clip_thread.is_alive()
+
+            if should_be_recording and not is_thread_running:
+                print("RECORDER: State machine is starting the clip recording thread.")
+                self._clip_thread = threading.Thread(target=self._clip_recording_loop, daemon=True)
+                self._clip_thread.start()
+            
+            time.sleep(1)
+
+        print("RECORDER: Shutdown signal received.")
+        self.shutdown()
+
+    def shutdown(self):
+        """Gracefully shuts down the recorder."""
+        print("RECORDER: Shutting down...")
+        self.state.set_is_recording(False)
+        
+        with self._lock:
+            clip_thread_to_join = self._clip_thread
+
+        if clip_thread_to_join and clip_thread_to_join.is_alive():
+            print("RECORDER: Waiting for final clip to finish processing...")
+            clip_thread_to_join.join(timeout=30.0)
+        
+        if self.picam2.started:
+            print("RECORDER: Stopping camera system.")
+            self.picam2.stop()
+        
+        # --- FIX: Terminate the audio interface LAST, after all threads are joined ---
+        self.audio_interface.terminate()
+        print("RECORDER: Recorder shutdown complete.")
 
     def _process_finished_clip(self, temp_video_path, temp_audio_path, final_video_path):
         # --- Signal start of processing ---
@@ -240,52 +288,4 @@ class Recorder:
         finally:
             print("RECORDER: Data logging thread finished.")
 
-    def run(self):
-        """The main state machine loop for the entire Recorder controller."""
-        print("RECORDER: Starting camera and entering main control loop...")
-        self.picam2.start()
-        
-        # --- FIX: Start the MJPEG encoder in a NON-BLOCKING way ---
-        mjpeg_encoder = MJPEGEncoder()
-        streaming_output = self.state.get_streaming_output()
-        lores_output = FileOutput(streaming_output)
-        self.picam2.start_encoder(mjpeg_encoder, lores_output, name="lores")
-        print("RECORDER: MJPEG encoder for live preview started on 'lores' stream.")
 
-        while self.state.get_app_running():
-            should_be_recording = self.state.get_is_recording()
-
-            with self._lock:
-                is_thread_running = self._clip_thread and self._clip_thread.is_alive()
-
-            if should_be_recording and not is_thread_running:
-                # State wants to record, but our clip thread isn't running. Start it.
-                print("RECORDER: State machine is starting the clip recording thread.")
-                self._clip_thread = threading.Thread(target=self._clip_recording_loop, daemon=True)
-                self._clip_thread.start()
-            
-            time.sleep(1) # Main loop polling interval
-
-        print("RECORDER: Shutdown signal received.")
-        self.shutdown()
-
-    def shutdown(self):
-        """Gracefully shuts down the recorder."""
-        print("RECORDER: Shutting down...")
-        # Signal the clip loop to stop
-        self.state.set_is_recording(False)
-        
-        # --- FIX: Wait for the clip thread to finish, if it exists ---
-        with self._lock:
-            clip_thread_to_join = self._clip_thread
-
-        if clip_thread_to_join and clip_thread_to_join.is_alive():
-            print("RECORDER: Waiting for final clip to finish processing...")
-            clip_thread_to_join.join(timeout=30.0) # Generous timeout
-        
-        if self.picam2.started:
-            print("RECORDER: Stopping camera system.")
-            self.picam2.stop()
-        
-        self.audio_interface.terminate()
-        print("RECORDER: Recorder shutdown complete.")
