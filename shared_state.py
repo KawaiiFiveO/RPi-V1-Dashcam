@@ -133,13 +133,6 @@ class AppState:
             self.v1_data.last_seen_rssi = rssi
             self.v1_data.is_connected = False
             
-    def set_v1_live_rssi(self, rssi: int):
-        """Atomically updates the V1's live RSSI value when connected."""
-        with self._lock:
-            # Only update if the status is actually 'Connected'
-            if self.v1_data.is_connected:
-                self.v1_data.last_seen_rssi = rssi
-            
     def update_v1_alert_data(self, in_alert: bool, band: str, freq: float, front_str: int, rear_str: int):
         """Atomically updates the core V1 alert information from the alert table."""
         with self._lock:
