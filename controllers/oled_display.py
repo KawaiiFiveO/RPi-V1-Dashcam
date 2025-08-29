@@ -119,7 +119,10 @@ class OledDisplay:
         web_status = self.state.get_web_server_status()
 
         # Line 1: V1 connection status
-        if v1_data.is_connected:
+        if v1_data.connection_status == "Scanning" and v1_data.last_seen_rssi != 0:
+            # Display signal strength when a device has been seen during a scan
+            v1_status_text = f"V1 Scan: {v1_data.last_seen_rssi}dBm"
+        elif v1_data.is_connected:
             v1_status_text = f"V1: {v1_data.v1_mode}"
         else:
             v1_status_text = f"V1: {v1_data.connection_status}"

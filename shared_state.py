@@ -20,7 +20,7 @@ class V1Data:
     """Holds the current state of the Valentine One detector."""
     is_connected: bool = False
     connection_status: str = "Disconnected" # Disconnected, Scanning, Connecting, Connected
-    in_alert: bool = False
+    last_seen_rssi: int = 0
     in_alert: bool = False
     priority_alert_freq: float = 0.0
     priority_alert_band: str = "N/A"
@@ -114,6 +114,8 @@ class AppState:
         with self._lock:
             self.v1_data.is_connected = is_connected
             self.v1_data.connection_status = status
+            if status != "Scanning":
+                self.v1_data.last_seen_rssi = 0
             if not is_connected:
                 self.v1_data.in_alert = False
                 self.v1_data.v1_mode = "Standby"
@@ -123,7 +125,14 @@ class AppState:
                 self.v1_data.priority_alert_strength = 0
                 self.v1_data.priority_alert_front_strength = 0
                 self.v1_data.priority_alert_rear_strength = 0
-
+                
+    def set_v1_scan_result(self, status: str, rssi: int):
+        """Atomically updates the state with scan results."""
+        with self._lock:
+            self.v1_data.connection_status = status
+            self.v1_data.last_seen_rssi = rssi
+            self.v1_data.is_connected = False
+            
     def update_v1_alert_data(self, in_alert: bool, band: str, freq: float, front_str: int, rear_str: int):
         """Atomically updates the core V1 alert information from the alert table."""
         with self._lock:

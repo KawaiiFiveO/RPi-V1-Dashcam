@@ -4,7 +4,7 @@ import asyncio
 import struct
 import logging
 from enum import IntEnum
-from typing import List, Optional, Callable, Dict, Type
+from typing import List, Optional, Callable, Dict, Type, Tuple
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
@@ -194,16 +194,16 @@ class V1BleakClient:
         self.request_lock = asyncio.Lock()
         self.pending_responses: Dict[PacketId, asyncio.Queue] = {}
 
-    async def scan(self) -> Optional[BLEDevice]:
+    async def scan(self) -> Optional[Tuple[BLEDevice, int]]:
+        """Scans for V1 devices and returns the first one found along with its RSSI."""
         print("V1CLIENT: Scanning for V1 devices...")
         try:
-            # --- FIX: Use discover() for more reliability in noisy areas ---
-            # Increase timeout to 20 seconds
             devices = await BleakScanner.discover(service_uuids=[config.V1_SERVICE_UUID], timeout=20.0)
             if devices:
-                print(f"V1CLIENT: Found {len(devices)} V1 device(s). Connecting to the first one.")
-                return devices[0]
-            return None # No devices found
+                best_device = devices[0]
+                print(f"V1CLIENT: Found {best_device.name} with RSSI: {best_device.rssi} dBm")
+                return (best_device, best_device.rssi)
+            return None
         except Exception as e:
             print(f"V1CLIENT: Error during BLE scan: {e}")
             return None
@@ -447,16 +447,18 @@ class V1Controller:
                         await self.v1_client.disconnect()
                 
                 self.state.set_v1_connection_status(False, "Scanning")
-                device = await self.v1_client.scan()
+                scan_result = await self.v1_client.scan()
                 
-                if not device:
+                if not scan_result:
                     print("V1CONTROLLER: No V1 device found. Retrying in 15 seconds...")
                     self.state.set_v1_connection_status(False, "Disconnected")
                     await asyncio.sleep(15)
                     continue
                 
+                device, rssi = scan_result
+                self.state.set_v1_scan_result("Connecting", rssi)
+                
                 try:
-                    self.state.set_v1_connection_status(False, "Connecting")
                     if await self.v1_client.connect(device):
                         self.state.set_v1_connection_status(True, "Connected")
                         
