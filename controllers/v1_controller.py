@@ -185,7 +185,7 @@ def packet_factory(raw_data: bytes, v1_type: DeviceId) -> Optional[ESPPacket]:
 # -----------------------------------------------------------------------------
 class V1BleakClient:
     def __init__(self):
-        self.client: Optional[BleakClient] = 
+        self.client: Optional[BleakClient] = None
         self.disconnected_callback: Optional[Callable[[BleakClient], None]] = None
         self.v1_type: DeviceId = DeviceId.UNKNOWN_DEVICE
         self.can_send_event = asyncio.Event()
