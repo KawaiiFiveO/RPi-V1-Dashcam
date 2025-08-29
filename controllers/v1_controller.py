@@ -185,7 +185,8 @@ def packet_factory(raw_data: bytes, v1_type: DeviceId) -> Optional[ESPPacket]:
 # -----------------------------------------------------------------------------
 class V1BleakClient:
     def __init__(self):
-        self.client: Optional[BleakClient] = None
+        self.client: Optional[BleakClient] = 
+        self.disconnected_callback: Optional[Callable[[BleakClient], None]] = None
         self.v1_type: DeviceId = DeviceId.UNKNOWN_DEVICE
         self.can_send_event = asyncio.Event()
         self.can_send_event.set()
@@ -236,9 +237,16 @@ class V1BleakClient:
             # Always ensure the scanner is stopped
             await scanner.stop()
 
+    def _handle_disconnect(self, client: BleakClient):
+        """Internal handler to be called by bleak when a disconnection occurs."""
+        print(f"V1CLIENT: Disconnected from {client.address}")
+        # If a public callback is registered, call it.
+        if self.disconnected_callback:
+            self.disconnected_callback(client)
+
     async def connect(self, device: BLEDevice) -> bool:
         print(f"V1CLIENT: Connecting to {device.name} ({device.address})...")
-        self.client = BleakClient(device)
+        self.client = BleakClient(device, disconnected_callback=self._handle_disconnect)
         try:
             # --- FIX: Add specific timeout and detailed error logging ---
             await self.client.connect(timeout=20.0) # 20 second connection timeout
@@ -470,13 +478,11 @@ class V1Controller:
             while self.state.get_app_running():
                 # --- Outer Loop: Handles scanning and connection attempts ---
                 
-                # Check for manual reconnect request
                 if self.state.get_and_clear_v1_reconnect_request():
                     print("V1CONTROLLER: Manual reconnect triggered.")
                     if self.v1_client.client and self.v1_client.client.is_connected:
                         await self.v1_client.disconnect()
 
-                # 1. Scan for the device
                 self.state.set_v1_connection_status(False, "Scanning")
                 scan_result = await self.v1_client.scan()
                 
@@ -484,45 +490,48 @@ class V1Controller:
                     print("V1CONTROLLER: No V1 device found. Retrying in 15 seconds...")
                     self.state.set_v1_connection_status(False, "Disconnected")
                     await asyncio.sleep(15)
-                    continue # Go back to the top of the while loop to scan again
+                    continue
                 
                 device, rssi = scan_result
                 self.state.set_v1_scan_result("Connecting", rssi)
 
-                # 2. Attempt to connect
+                # --- NEW: Setup an event to wait for disconnection ---
+                disconnected_event = asyncio.Event()
+                def handle_disconnect(client: BleakClient):
+                    """Callback to be triggered by V1BleakClient on disconnect."""
+                    print("V1CONTROLLER: Disconnect event received from callback.")
+                    disconnected_event.set()
+
+                self.v1_client.disconnected_callback = handle_disconnect
+
                 try:
                     is_connected = await self.v1_client.connect(device)
                     
                     if is_connected:
-                        # --- Inner "Connected" State ---
                         self.state.set_v1_connection_status(True, "Connected")
                         print("V1CONTROLLER: Connection successful. Performing startup checks.")
                         
                         await self._perform_startup_checks()
                         await self.v1_client.start_alert_data()
                         
-                        # This loop runs as long as we are connected.
-                        while self.state.get_app_running() and self.v1_client.client.is_connected:
-                            if self.state.get_and_clear_v1_reconnect_request():
-                                print("V1CONTROLLER: Manual reconnect triggered while connected.")
-                                break # Break inner loop to force disconnect and rescan
-                            await asyncio.sleep(1)
+                        # --- MODIFIED: The "connected" loop now waits on the event ---
+                        print("V1CONTROLLER: Now in connected state, waiting for disconnect event...")
+                        await disconnected_event.wait()
                         
-                        # If we exit this loop, it means we disconnected for some reason.
+                        # If we get here, the disconnected_callback was triggered.
                         print("V1CONTROLLER: Device disconnected.")
 
                     else:
-                        # This block runs if self.v1_client.connect() returns False
                         print("V1CONTROLLER: Connection attempt failed.")
                         self.state.set_v1_connection_status(False, "Connect Failed")
                         await asyncio.sleep(10)
 
                 except BleakError as e:
-                    print(f"V1CONTROLLER: A Bluetooth error occurred during connection/operation: {e}")
+                    # This will now catch errors that happen during the connected phase as well
+                    print(f"V1CONTROLLER: A Bluetooth error occurred: {e}")
                     self.state.set_v1_connection_status(False, "Error")
                 
                 finally:
-                    # This finally block now correctly runs after a disconnect or a connection error
                     print("V1CONTROLLER: Cleaning up connection...")
                     await self.v1_client.disconnect()
                     self.state.set_v1_connection_status(False, "Disconnected")
