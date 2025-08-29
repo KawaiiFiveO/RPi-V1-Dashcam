@@ -495,10 +495,8 @@ class V1Controller:
                 device, rssi = scan_result
                 self.state.set_v1_scan_result("Connecting", rssi)
 
-                # --- NEW: Setup an event to wait for disconnection ---
                 disconnected_event = asyncio.Event()
                 def handle_disconnect(client: BleakClient):
-                    """Callback to be triggered by V1BleakClient on disconnect."""
                     print("V1CONTROLLER: Disconnect event received from callback.")
                     disconnected_event.set()
 
@@ -514,11 +512,35 @@ class V1Controller:
                         await self._perform_startup_checks()
                         await self.v1_client.start_alert_data()
                         
-                        # --- MODIFIED: The "connected" loop now waits on the event ---
-                        print("V1CONTROLLER: Now in connected state, waiting for disconnect event...")
-                        await disconnected_event.wait()
+                        print("V1CONTROLLER: Now in connected state, monitoring connection...")
                         
-                        # If we get here, the disconnected_callback was triggered.
+                        # --- MODIFIED: The "connected" loop now polls for RSSI ---
+                        while not disconnected_event.is_set():
+                            # Check for manual reconnect request
+                            if self.state.get_and_clear_v1_reconnect_request():
+                                print("V1CONTROLLER: Manual reconnect triggered while connected.")
+                                break # Break inner loop to force disconnect and rescan
+                            
+                            try:
+                                # Get the current RSSI value
+                                current_rssi = await self.v1_client.client.get_rssi()
+                                print(f"V1CONTROLLER: Live RSSI: {current_rssi} dBm")
+                                
+                                # Update the shared state with the live RSSI
+                                self.state.set_v1_live_rssi(current_rssi)
+
+                                # Wait for 5 seconds before the next poll.
+                                # We use wait_for to make the sleep interruptible by the disconnect event.
+                                await asyncio.wait_for(disconnected_event.wait(), timeout=5.0)
+                            
+                            except asyncio.TimeoutError:
+                                # This is the normal case; the 5 seconds elapsed without a disconnect.
+                                continue
+                            except BleakError as e:
+                                print(f"V1CONTROLLER: BleakError while getting RSSI: {e}")
+                                # An error here often precedes a disconnect, so we break to clean up.
+                                break
+                        
                         print("V1CONTROLLER: Device disconnected.")
 
                     else:
