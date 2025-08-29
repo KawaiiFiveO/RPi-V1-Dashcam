@@ -195,18 +195,45 @@ class V1BleakClient:
         self.pending_responses: Dict[PacketId, asyncio.Queue] = {}
 
     async def scan(self) -> Optional[Tuple[BLEDevice, int]]:
-        """Scans for V1 devices and returns the first one found along with its RSSI."""
-        print("V1CLIENT: Scanning for V1 devices...")
+        """Scans for V1 devices using a callback to capture RSSI immediately."""
+        print("V1CLIENT: Scanning for V1 devices for 20 seconds...")
+        
+        # This event will be set by the callback when a V1 is found
+        v1_found_event = asyncio.Event()
+        found_device_info = {}
+
+        def detection_callback(device: BLEDevice, advertisement_data: AdvertisementData):
+            """This function is called for each BLE advertisement received."""
+            # Check if this is the first time we've seen a V1 in this scan
+            if not v1_found_event.is_set():
+                # Check if the advertisement contains the V1 service UUID
+                if config.V1_SERVICE_UUID.lower() in advertisement_data.service_uuids:
+                    print(f"V1CLIENT: Found {device.name} with RSSI: {advertisement_data.rssi} dBm")
+                    # Store the device and its RSSI
+                    found_device_info['device'] = device
+                    found_device_info['rssi'] = advertisement_data.rssi
+                    # Signal the main scan function that we're done
+                    v1_found_event.set()
+
+        # Create a scanner instance with our callback
+        scanner = BleakScanner(detection_callback=detection_callback)
+
         try:
-            devices = await BleakScanner.discover(service_uuids=[config.V1_SERVICE_UUID], timeout=20.0)
-            if devices:
-                best_device = devices[0]
-                print(f"V1CLIENT: Found {best_device.name} with RSSI: {best_device.rssi} dBm")
-                return (best_device, best_device.rssi)
+            # Start the scanner. This is non-blocking.
+            await scanner.start()
+            # Wait for either our callback to find a V1 or for the timeout to expire
+            await asyncio.wait_for(v1_found_event.wait(), timeout=20.0)
+            # If we're here, the event was set, so we found a device
+            return (found_device_info['device'], found_device_info['rssi'])
+        except asyncio.TimeoutError:
+            print("V1CLIENT: Scan timed out. No V1 device found.")
             return None
         except Exception as e:
             print(f"V1CLIENT: Error during BLE scan: {e}")
             return None
+        finally:
+            # Always ensure the scanner is stopped
+            await scanner.stop()
 
     async def connect(self, device: BLEDevice) -> bool:
         print(f"V1CLIENT: Connecting to {device.name} ({device.address})...")
