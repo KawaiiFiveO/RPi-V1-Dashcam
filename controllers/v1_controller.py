@@ -495,10 +495,8 @@ class V1Controller:
                 device, rssi = scan_result
                 self.state.set_v1_scan_result("Connecting", rssi)
 
-                # --- NEW: Setup an event to wait for disconnection ---
                 disconnected_event = asyncio.Event()
                 def handle_disconnect(client: BleakClient):
-                    """Callback to be triggered by V1BleakClient on disconnect."""
                     print("V1CONTROLLER: Disconnect event received from callback.")
                     disconnected_event.set()
 
@@ -514,12 +512,39 @@ class V1Controller:
                         await self._perform_startup_checks()
                         await self.v1_client.start_alert_data()
                         
-                        # --- MODIFIED: The "connected" loop now waits on the event ---
-                        print("V1CONTROLLER: Now in connected state, waiting for disconnect event...")
-                        await disconnected_event.wait()
+                        # --- FIX: Create two tasks to wait for ---
                         
-                        # If we get here, the disconnected_callback was triggered.
-                        print("V1CONTROLLER: Device disconnected.")
+                        # Task 1: Waits for the disconnect event from the callback
+                        disconnect_task = asyncio.create_task(disconnected_event.wait())
+
+                        # Task 2: Periodically checks for a manual reconnect request
+                        async def manual_reconnect_checker():
+                            while not self.state.get_and_clear_v1_reconnect_request():
+                                # If the disconnect happens while we're sleeping, exit
+                                if disconnected_event.is_set():
+                                    return
+                                await asyncio.sleep(1)
+                            # If the loop exits, it means a reconnect was requested
+                            print("V1CONTROLLER: Manual reconnect triggered while connected.")
+
+                        reconnect_task = asyncio.create_task(manual_reconnect_checker())
+
+                        # --- FIX: Use asyncio.wait() to wait for the FIRST task to complete ---
+                        print("V1CONTROLLER: Now in connected state, monitoring for events...")
+                        done, pending = await asyncio.wait(
+                            [disconnect_task, reconnect_task],
+                            return_when=asyncio.FIRST_COMPLETED
+                        )
+
+                        # Cancel any tasks that are still pending to clean up resources
+                        for task in pending:
+                            task.cancel()
+                        
+                        # Determine why we exited the wait
+                        if reconnect_task in done:
+                            print("V1CONTROLLER: Exiting connected state due to manual reconnect.")
+                        else: # disconnect_task must be in done
+                            print("V1CONTROLLER: Exiting connected state due to device disconnection.")
 
                     else:
                         print("V1CONTROLLER: Connection attempt failed.")
@@ -527,7 +552,6 @@ class V1Controller:
                         await asyncio.sleep(10)
 
                 except BleakError as e:
-                    # This will now catch errors that happen during the connected phase as well
                     print(f"V1CONTROLLER: A Bluetooth error occurred: {e}")
                     self.state.set_v1_connection_status(False, "Error")
                 
