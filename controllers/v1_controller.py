@@ -8,6 +8,7 @@ from typing import List, Optional, Callable, Dict, Type, Tuple
 
 from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
+from bleak.backends.scanner import AdvertisementData
 from bleak.exc import BleakError
 
 # Import shared application components
