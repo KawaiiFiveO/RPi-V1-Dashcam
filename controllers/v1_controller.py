@@ -390,6 +390,7 @@ class V1Controller:
         self.v1_client.display_callback = self._handle_display_data
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.main_task: Optional[asyncio.Task] = None
+        self._background_tasks = set()
         
 
     def _get_band_from_freq(self, freq_mhz: int) -> str:
