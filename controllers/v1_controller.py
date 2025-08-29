@@ -390,7 +390,7 @@ class V1Controller:
         self.v1_client.display_callback = self._handle_display_data
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.main_task: Optional[asyncio.Task] = None
-        self._background_tasks = set()
+        
 
     def _get_band_from_freq(self, freq_mhz: int) -> str:
         # ... (this method is unchanged) ...
@@ -477,8 +477,32 @@ class V1Controller:
         """The asynchronous core of the controller."""
         try:
             while self.state.get_app_running():
-                # ... (Outer loop for scanning and connecting is unchanged) ...
+                # --- Outer Loop: Handles scanning and connection attempts ---
                 
+                if self.state.get_and_clear_v1_reconnect_request():
+                    print("V1CONTROLLER: Manual reconnect triggered.")
+                    if self.v1_client.client and self.v1_client.client.is_connected:
+                        await self.v1_client.disconnect()
+
+                self.state.set_v1_connection_status(False, "Scanning")
+                scan_result = await self.v1_client.scan()
+                
+                if not scan_result:
+                    print("V1CONTROLLER: No V1 device found. Retrying in 15 seconds...")
+                    self.state.set_v1_connection_status(False, "Disconnected")
+                    await asyncio.sleep(15)
+                    continue
+                
+                device, rssi = scan_result
+                self.state.set_v1_scan_result("Connecting", rssi)
+
+                disconnected_event = asyncio.Event()
+                def handle_disconnect(client: BleakClient):
+                    print("V1CONTROLLER: Disconnect event received from callback.")
+                    disconnected_event.set()
+
+                self.v1_client.disconnected_callback = handle_disconnect
+
                 try:
                     is_connected = await self.v1_client.connect(device)
                     
@@ -520,11 +544,6 @@ class V1Controller:
                         else:
                             print("V1CONTROLLER: Exiting connected state due to device disconnection.")
 
-                    else:
-                        print("V1CONTROLLER: Connection attempt failed.")
-                        self.state.set_v1_connection_status(False, "Connect Failed")
-                        await asyncio.sleep(10)
-
                 except BleakError as e:
                     print(f"V1CONTROLLER: A Bluetooth error occurred: {e}")
                     self.state.set_v1_connection_status(False, "Error")
@@ -541,6 +560,7 @@ class V1Controller:
         except asyncio.CancelledError:
             print("V1CONTROLLER: Async task cancelled.")
         finally:
+            # --- FIX: Cancel all tracked background tasks on shutdown ---
             print(f"V1CONTROLLER: Cleaning up {len(self._background_tasks)} background task(s)...")
             for task in self._background_tasks:
                 task.cancel()
