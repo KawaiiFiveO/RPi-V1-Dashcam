@@ -468,12 +468,15 @@ class V1Controller:
         """The asynchronous core of the controller."""
         try:
             while self.state.get_app_running():
-                # --- FIX: Check for manual reconnect request ---
+                # --- Outer Loop: Handles scanning and connection attempts ---
+                
+                # Check for manual reconnect request
                 if self.state.get_and_clear_v1_reconnect_request():
                     print("V1CONTROLLER: Manual reconnect triggered.")
                     if self.v1_client.client and self.v1_client.client.is_connected:
                         await self.v1_client.disconnect()
-                
+
+                # 1. Scan for the device
                 self.state.set_v1_connection_status(False, "Scanning")
                 scan_result = await self.v1_client.scan()
                 
@@ -481,40 +484,53 @@ class V1Controller:
                     print("V1CONTROLLER: No V1 device found. Retrying in 15 seconds...")
                     self.state.set_v1_connection_status(False, "Disconnected")
                     await asyncio.sleep(15)
-                    continue
+                    continue # Go back to the top of the while loop to scan again
                 
                 device, rssi = scan_result
                 self.state.set_v1_scan_result("Connecting", rssi)
-                
+
+                # 2. Attempt to connect
                 try:
-                    if await self.v1_client.connect(device):
+                    is_connected = await self.v1_client.connect(device)
+                    
+                    if is_connected:
+                        # --- Inner "Connected" State ---
                         self.state.set_v1_connection_status(True, "Connected")
+                        print("V1CONTROLLER: Connection successful. Performing startup checks.")
                         
                         await self._perform_startup_checks()
                         await self.v1_client.start_alert_data()
                         
+                        # This loop runs as long as we are connected.
                         while self.state.get_app_running() and self.v1_client.client.is_connected:
-                            # --- FIX: Check for manual reconnect request inside connected loop ---
                             if self.state.get_and_clear_v1_reconnect_request():
                                 print("V1CONTROLLER: Manual reconnect triggered while connected.")
                                 break # Break inner loop to force disconnect and rescan
                             await asyncio.sleep(1)
-                        else:
-                            print("V1CONTROLLER: Connection attempt failed.")
-                            self.state.set_v1_connection_status(False, "Connect Failed")
-                            await asyncio.sleep(10) # Wait before retrying
+                        
+                        # If we exit this loop, it means we disconnected for some reason.
+                        print("V1CONTROLLER: Device disconnected.")
+
+                    else:
+                        # This block runs if self.v1_client.connect() returns False
+                        print("V1CONTROLLER: Connection attempt failed.")
+                        self.state.set_v1_connection_status(False, "Connect Failed")
+                        await asyncio.sleep(10)
 
                 except BleakError as e:
-                    print(f"V1CONTROLLER: A Bluetooth error occurred in the main loop: {e}")
+                    print(f"V1CONTROLLER: A Bluetooth error occurred during connection/operation: {e}")
                     self.state.set_v1_connection_status(False, "Error")
+                
                 finally:
+                    # This finally block now correctly runs after a disconnect or a connection error
                     print("V1CONTROLLER: Cleaning up connection...")
                     await self.v1_client.disconnect()
                     self.state.set_v1_connection_status(False, "Disconnected")
                     
                     if self.state.get_app_running():
-                        print("V1CONTROLLER: Connection lost. Will attempt to reconnect...")
+                        print("V1CONTROLLER: Will attempt to reconnect...")
                         await asyncio.sleep(5)
+
         except asyncio.CancelledError:
             print("V1CONTROLLER: Async task cancelled.")
         finally:
